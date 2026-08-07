@@ -1,0 +1,16 @@
+# Copy to gpu.local.toml and fill in the password locally.
+# gpu.local.toml is intentionally ignored to keep credentials out of Git history.
+[ssh]
+host = "connect.nmb1.seetacloud.com"
+port = 22754
+user = "root"
+password_env = "CIMFUSEMARK_GPU_PASSWORD"
+
+[remote]
+project_dir = "/root/CIMFuseMark"
+
+[hardware]
+# Verified through nvidia-smi on 2026-08-08.
+gpu = "NVIDIA GeForce RTX 4090"
+memory_mib = 24564
+driver = "580.105.08"
