@@ -1,0 +1,19 @@
+{
+  "seed": 2026,
+  "hidden_dim": 64,
+  "embedding_dim": 128,
+  "fingerprint_bits": 256,
+  "epochs": 150,
+  "learning_rate": 0.001,
+  "weight_decay": 0.0001,
+  "robust_weight": 2.0,
+  "separation_weight": 1.0,
+  "balance_weight": 0.05,
+  "separation_margin": 0.35,
+  "train_families": [
+    "deby_lod2_5744682", "jefferson", "building_units_storeys",
+    "road_over_bridge", "parking_garage", "historical_succession", "local_crs"
+  ],
+  "validation_families": ["opera_lyon", "nested_features"],
+  "test_families": ["simple_building_series", "ogc_building_series"]
+}

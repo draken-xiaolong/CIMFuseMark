@@ -1,0 +1,40 @@
+import tempfile
+import unittest
+from pathlib import Path
+
+from cimfusemark import attack_citygml_xml, build_citygml_graph, graph_fingerprint, similarity
+
+DATA = Path(__file__).parents[1] / "data" / "Building_CityGML3.0_LOD2_with_several_attributes.gml"
+
+
+class CityGMLGraphTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.graph = build_citygml_graph(DATA)
+
+    def test_hierarchy_and_relations_exist(self):
+        self.assertGreater(len(self.graph.nodes), 1)
+        relations = {edge.relation for edge in self.graph.edges}
+        self.assertIn("bounded_by", relations)
+        self.assertIn("part_of", relations)
+
+    def test_xml_rigid_attacks_are_invariant(self):
+        reference = graph_fingerprint(self.graph)
+        with tempfile.TemporaryDirectory() as directory:
+            for attack in ("translation", "scale", "rotation_z", "object_reorder"):
+                path = Path(directory) / f"{attack}.gml"
+                attack_citygml_xml(DATA, path, attack, 0.0)
+                candidate = graph_fingerprint(build_citygml_graph(path))
+                self.assertGreaterEqual(similarity(reference, candidate), 0.99, attack)
+
+    def test_object_delete_removes_real_node(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "deleted.gml"
+            mutation = attack_citygml_xml(DATA, path, "object_delete", 0.10)
+            attacked = build_citygml_graph(path)
+            self.assertGreater(mutation["changed_elements"], 0)
+            self.assertLess(len(attacked.nodes), len(self.graph.nodes))
+
+
+if __name__ == "__main__":
+    unittest.main()

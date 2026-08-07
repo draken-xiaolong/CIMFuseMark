@@ -12,6 +12,15 @@ python3 code/run_benchmark.py
 PYTHONPATH=code python3 -m unittest discover -s code/tests -v
 ```
 
+For the optional relational-GNN prototype:
+
+```bash
+python3 -m pip install -r code/requirements-gnn.txt
+PYTHONPATH=code python3 code/audit_graphs.py
+PYTHONPATH=code python3 code/run_graph_benchmark.py
+PYTHONPATH=code python3 code/train_rgcn_demo.py
+```
+
 Results are written to `code/results/demo_results.json`. The implementation uses only the Python standard library.
 
 ## First result
@@ -48,9 +57,25 @@ The benchmark adds 14 traceable OGC CityGML example files. Files believed to rep
 
 The threshold is selected and evaluated on the same small benchmark, so it is optimistic and must not be treated as a deployment threshold. The failures identify two next research problems: collisions between geometrically similar models and cross-LoD/cross-encoding consistency.
 
+## v0.3 semantic relational graph
+
+The v0.3 graph builder preserves CityGML objects instead of reducing the file to an unordered point cloud. Nodes include buildings, parts, rooms, boundary surfaces, roads, bridges, and other supported city objects. Directed typed edges include hierarchy, `bounded_by`, `part_of`, spatial proximity, and resolved XLinks. Coordinates are assigned to the nearest semantic owner and then aggregated through the hierarchy.
+
+The bundled corpus currently produces 243 nodes and 1,157 typed edges. XML attacks edit complete source trees and rebuild the graph afterwards; object deletion therefore removes real CityGML subtrees rather than changing an already-computed counter.
+
+| Method | Evaluation scope | Same-source q05 | Different-source q95 | Related-version minimum |
+|---|---|---:|---:|---:|
+| v0.2 global handcrafted | all 14 examples | 0.980 | 0.953 | 0.551 |
+| v0.3 non-learned relational graph | all 14 examples | 0.980 | 0.936 | 0.762 |
+| v0.3 R-GCN prototype | held-out 4-file test split | 0.972 | 0.521 | 0.508 |
+
+The scopes differ, so the table is diagnostic rather than a fair leaderboard. The non-learned graph improves the different-source tail and related-version minimum on the complete sample. The R-GCN strongly separates the tiny held-out test set but does not generalize to an unseen cross-LoD pair; explicit paired cross-LoD training data is required.
+
+The R-GCN uses two relation-specific message-passing layers, mean/max/attention graph readout, and a fixed key-dependent binary projection. It is implemented with plain PyTorch and does not require PyTorch Geometric.
+
 ## What this demo proves (and does not prove)
 
-This is a feasibility check, not the final paper algorithm. It tests whether CityGML models can yield stable content fingerprints under translation, rotation, uniform scaling, coordinate noise, coordinate quantization, contiguous spatial cropping, and an approximate semantic-object deletion. It does not yet mutate complete XML object subtrees, model surface connectivity, execute real CityGML/CityJSON conversion, learn representations, or validate a held-out false-positive threshold.
+This is a feasibility check, not the final paper algorithm. It tests whether CityGML models can yield stable content fingerprints under translation, rotation, uniform scaling, coordinate noise, coordinate quantization, contiguous spatial cropping, attribute deletion, object reordering, and real XML object-subtree deletion. It does not yet compute exact surface-touch topology, execute real CityGML/CityJSON conversion, train on a representative city-scale corpus, or validate a deployment false-positive threshold.
 
 ## Data
 
