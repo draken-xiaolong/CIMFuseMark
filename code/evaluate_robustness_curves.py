@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent
 DATA_ROOT = ROOT / "data"
 
 DEFAULT_SWEEPS = {
-    "object_delete": [0.05, 0.10, 0.20, 0.30, 0.40, 0.50],
+    "object_delete": [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80],
     "attribute_delete": [0.10, 0.20, 0.40, 0.60, 0.80],
     "quantization": [0.001, 0.005, 0.01, 0.02, 0.05],
     "rotation_z": [30.0, 60.0, 90.0, 120.0, 180.0],
@@ -86,9 +86,13 @@ def main() -> None:
                         attacked_path = temporary_root / f"{item['id']}__{attack}_{level}.gml"
                         mutation = attack_citygml_xml(source, attacked_path, attack, level,
                                                       seed=int(config["seed"]))
-                        attacked = build_citygml_graph(attacked_path)
-                        bits = encode(model, attacked, relations, device, relation_mode, feature_mode)
-                        scores.append(bit_similarity(clean_bits[item["id"]], bits))
+                        try:
+                            attacked = build_citygml_graph(attacked_path)
+                            bits = encode(model, attacked, relations, device, relation_mode, feature_mode)
+                            scores.append(bit_similarity(clean_bits[item["id"]], bits))
+                        except ValueError:
+                            # A destructively emptied model is an authentication failure, not a missing sample.
+                            scores.append(0.0)
                         changed.append(int(mutation["changed_elements"]))
                     points.append({
                         "intensity": level, "models": len(scores),
