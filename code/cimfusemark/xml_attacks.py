@@ -74,7 +74,8 @@ def attack_citygml_xml(input_path: str | Path, output_path: str | Path, attack: 
                 if attack == "translation": x, y, z = x + 123.4, y - 56.7, z + 8.9
                 elif attack == "scale": x, y, z = x * 3.7, y * 3.7, z * 3.7
                 elif attack == "rotation_z":
-                    angle = math.radians(37); c, s = math.cos(angle), math.sin(angle)
+                    angle = math.radians(severity if severity else 37)
+                    c, s = math.cos(angle), math.sin(angle)
                     x, y = c*x-s*y, s*x+c*y
                 else:
                     step = max(severity * diagonal, 1e-12)

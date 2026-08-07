@@ -158,7 +158,8 @@ def main() -> None:
         result_path = ROOT / "results" / f"{args.output_prefix}_results.json"
         result_path.parent.mkdir(parents=True, exist_ok=True)
         result_path.write_text(json.dumps(output, indent=2), encoding="utf-8")
-        torch.save({"state_dict": model.state_dict(), "relations": relations, "config": config},
+        torch.save({"state_dict": model.state_dict(), "relations": relations, "config": config,
+                    "relation_mode": args.relation_mode, "feature_mode": args.feature_mode},
                    ROOT / "results" / f"{args.output_prefix}.pt")
         print(json.dumps(output, indent=2))
 
