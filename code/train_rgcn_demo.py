@@ -108,9 +108,10 @@ def main() -> None:
                     float(config["balance_weight"]) * balance)
             loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); optimizer.step()
             if epoch in {0, int(config["epochs"])-1} or (epoch+1) % 50 == 0:
-                print(json.dumps({"epoch": epoch+1, "loss": float(loss), "robust": float(robust),
-                                  "related": float(related),
-                                  "separation": float(separation), "balance": float(balance)}))
+                print(json.dumps({"epoch": epoch+1, "loss": float(loss.detach()),
+                                  "robust": float(robust.detach()), "related": float(related.detach()),
+                                  "separation": float(separation.detach()),
+                                  "balance": float(balance.detach())}))
 
         model.eval(); evaluations = {}
         with torch.no_grad():

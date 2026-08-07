@@ -102,6 +102,8 @@ PYTHONPATH=code python3 code/train_rgcn_demo.py --manifest code/data/plateau_man
 
 The training script now supports `--relation-mode typed|untyped|no_edges` and `--feature-mode full|geometry` for controlled ablations. Exact sources, years, mesh codes, and license links are versioned in `code/configs/plateau_sources.json`; generated data remains ignored.
 
+The first RTX 4090 run gives the following geographically held-out Shinjuku results: full typed R-GCN AUC 0.9944 / EER 3.35%, geometry-only AUC 0.9688 / EER 6.70%, untyped AUC 0.9939 / EER 3.35%, and no-edge AUC 0.9955 / EER 3.35%. Thus semantic node features help, but this corpus does not yet demonstrate a benefit from relation-aware message passing; the repeated building-to-surface star topology is likely too regular.
+
 ## What this demo proves (and does not prove)
 
 This is a feasibility check, not the final paper algorithm. It tests whether CityGML models can yield stable content fingerprints under translation, rotation, uniform scaling, coordinate noise, coordinate quantization, contiguous spatial cropping, attribute deletion, object reordering, and real XML object-subtree deletion. It does not yet compute exact surface-touch topology, execute real CityGML/CityJSON conversion, train on a representative city-scale corpus, or validate a deployment false-positive threshold.
