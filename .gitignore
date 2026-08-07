@@ -4,4 +4,6 @@ __pycache__/
 .venv/
 code/results/
 gpu.local.toml
-
+code/data/external_cache/
+code/data/ocm_tiles/
+code/data/ocm_manifest.json

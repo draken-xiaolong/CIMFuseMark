@@ -24,11 +24,11 @@ def attack_citygml_xml(input_path: str | Path, output_path: str | Path, attack: 
     changed = 0
     if attack == "object_delete":
         parent_map = {child: parent for parent in root.iter() for child in parent}
-        candidates = [
-            element for element in root.iter()
-            if _local_name(element.tag) in OBJECT_TYPES
-            and _local_name(element.tag) not in {"Building", "Bridge", "Road", "Tunnel"}
-        ]
+        semantic = [element for element in root.iter() if _local_name(element.tag) in OBJECT_TYPES]
+        top_level = [element for element in semantic if _local_name(element.tag) in {"Building", "Bridge", "Road", "Tunnel"}]
+        candidates = [element for element in semantic if element not in top_level]
+        if len(top_level) > 1:
+            candidates.extend(top_level)
         rng.shuffle(candidates)
         count = min(len(candidates), max(1, round(len(candidates) * severity))) if candidates else 0
         for element in candidates[:count]:
@@ -88,4 +88,3 @@ def attack_citygml_xml(input_path: str | Path, output_path: str | Path, attack: 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     tree.write(output_path, encoding="utf-8", xml_declaration=True)
     return {"attack": attack, "severity": severity, "changed_elements": changed, "output": str(output_path)}
-

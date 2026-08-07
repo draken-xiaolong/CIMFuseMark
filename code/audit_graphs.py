@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import argparse
 from collections import Counter
 from pathlib import Path
 
@@ -14,7 +15,11 @@ DATA_ROOT = ROOT / "data"
 
 
 def main() -> None:
-    manifest = json.loads((DATA_ROOT / "benchmark_manifest.json").read_text(encoding="utf-8"))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--manifest", default=str(DATA_ROOT / "benchmark_manifest.json"))
+    parser.add_argument("--output", default=str(ROOT / "results" / "graph_audit.json"))
+    args = parser.parse_args()
+    manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
     records, failures = [], []
     for item in manifest["models"]:
         try:
@@ -30,7 +35,7 @@ def main() -> None:
         except Exception as exc:
             failures.append({"id": item["id"], "error": f"{type(exc).__name__}: {exc}"})
     report = {"models": len(records), "failures": failures, "records": records}
-    output = ROOT / "results" / "graph_audit.json"
+    output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps({"models": len(records), "failures": failures,
@@ -42,4 +47,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

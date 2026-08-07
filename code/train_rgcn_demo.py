@@ -34,12 +34,14 @@ def main() -> None:
     parser.add_argument("--config", default=str(ROOT / "configs" / "rgcn_demo.json"))
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--epochs", type=int)
+    parser.add_argument("--manifest", default=str(DATA_ROOT / "benchmark_manifest.json"))
+    parser.add_argument("--output-prefix", default="rgcn_demo")
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
     if args.epochs is not None: config["epochs"] = args.epochs
     seed = int(config["seed"]); random.seed(seed); torch.manual_seed(seed)
     device = torch.device(args.device)
-    manifest = json.loads((DATA_ROOT / "benchmark_manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
 
     records = []
     with tempfile.TemporaryDirectory(prefix="cimfusemark_rgcn_") as temporary:
@@ -62,7 +64,9 @@ def main() -> None:
                             len(relations), int(config["fingerprint_bits"]), seed).to(device)
         optimizer = torch.optim.AdamW(model.parameters(), lr=float(config["learning_rate"]),
                                       weight_decay=float(config["weight_decay"]))
-        train = [record for record in records if record["family"] in config["train_families"]]
+        def in_split(record, split_name, family_key):
+            return record.get("split") == split_name if "split" in record else record["family"] in config[family_key]
+        train = [record for record in records if in_split(record, "train", "train_families")]
         for epoch in range(int(config["epochs"])):
             model.train(); optimizer.zero_grad()
             clean_embeddings, view_embeddings = [], []
@@ -96,10 +100,10 @@ def main() -> None:
 
         model.eval(); evaluations = {}
         with torch.no_grad():
-            for split_name, families in (("train", config["train_families"]),
-                                         ("validation", config["validation_families"]),
-                                         ("test", config["test_families"])):
-                selected = [record for record in records if record["family"] in families]
+            for split_name, family_key in (("train", "train_families"),
+                                           ("validation", "validation_families"),
+                                           ("test", "test_families")):
+                selected = [record for record in records if in_split(record, split_name, family_key)]
                 clean_bits = {}
                 positives = []
                 for record in selected:
@@ -131,13 +135,13 @@ def main() -> None:
         output = {
             "config": config, "device": str(device), "relations": relations,
             "model_digest": model_digest(model), "splits": evaluations,
-            "warning": "Prototype trained on a tiny standards-example corpus; test statistics are exploratory.",
+            "warning": "Exploratory prototype; thresholds require validation on larger independent regions.",
         }
-        result_path = ROOT / "results" / "rgcn_demo_results.json"
+        result_path = ROOT / "results" / f"{args.output_prefix}_results.json"
         result_path.parent.mkdir(parents=True, exist_ok=True)
         result_path.write_text(json.dumps(output, indent=2), encoding="utf-8")
         torch.save({"state_dict": model.state_dict(), "relations": relations, "config": config},
-                   ROOT / "results" / "rgcn_demo.pt")
+                   ROOT / "results" / f"{args.output_prefix}.pt")
         print(json.dumps(output, indent=2))
 
 

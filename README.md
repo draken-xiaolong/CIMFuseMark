@@ -21,6 +21,15 @@ PYTHONPATH=code python3 code/run_graph_benchmark.py
 PYTHONPATH=code python3 code/train_rgcn_demo.py
 ```
 
+For the geographically isolated Open City Model experiment:
+
+```bash
+PYTHONPATH=code python3 code/prepare_ocm_dataset.py
+PYTHONPATH=code python3 code/audit_graphs.py --manifest code/data/ocm_manifest.json --output code/results/ocm_graph_audit.json
+PYTHONPATH=code python3 code/run_graph_benchmark.py --manifest code/data/ocm_manifest.json --output code/results/ocm_graph_matched_results.json --attacks rotation_z,quantization,attribute_delete,object_delete
+PYTHONPATH=code python3 code/train_rgcn_demo.py --manifest code/data/ocm_manifest.json --output-prefix rgcn_ocm
+```
+
 Results are written to `code/results/demo_results.json`. The implementation uses only the Python standard library.
 
 ## First result
@@ -73,6 +82,14 @@ The scopes differ, so the table is diagnostic rather than a fair leaderboard. Th
 
 The R-GCN uses two relation-specific message-passing layers, mean/max/attention graph readout, and a fixed key-dependent binary projection. It is implemented with plain PyTorch and does not require PyTorch Geometric.
 
+## v0.4 geographically isolated benchmark
+
+The scalable experiment downloads three Open City Model CityGML archives and creates 48 non-overlapping tiles containing 1,200 buildings. Geographic splits are fixed before training: Alabama for training, California for validation, and Colorado for testing. Downloaded archives, generated tiles, manifests, checkpoints, and results remain local and are ignored by Git.
+
+On the Colorado split, using the same four attacks and the same 64 positive / 120 negative pairs, the non-learned graph fingerprint obtains AUC 0.9286 and EER 15.26%; the R-GCN obtains AUC 0.9720 and EER 6.46%. This is a useful feasibility result, not a publication-ready claim: the source is shallow LoD1 building data and currently yields only Building nodes and spatial-neighbor edges. It validates scale and geographic generalization, but not the proposed benefit of rich CIM semantics or hierarchy.
+
+See `docs/v0.4_ocm_geographic_benchmark_zh.md` for the protocol, results, limitations, and next experiment.
+
 ## What this demo proves (and does not prove)
 
 This is a feasibility check, not the final paper algorithm. It tests whether CityGML models can yield stable content fingerprints under translation, rotation, uniform scaling, coordinate noise, coordinate quantization, contiguous spatial cropping, attribute deletion, object reordering, and real XML object-subtree deletion. It does not yet compute exact surface-touch topology, execute real CityGML/CityJSON conversion, train on a representative city-scale corpus, or validate a deployment false-positive threshold.
@@ -86,6 +103,8 @@ https://github.com/opengeospatial/CityGML3.0-GML-Encoding/tree/main/resources/ex
 The original repository states that the example files are intended for testing implementations of the OGC CityGML standard. Source and attribution are retained in `code/data/SOURCE.md`.
 
 The family labels in `code/data/benchmark_manifest.json` are research metadata curated from upstream identifiers and example structure. They are not authoritative identity labels from OGC.
+
+The optional v0.4 dataset is downloaded from the [Open City Model AWS Open Data registry](https://registry.opendata.aws/opencitymodel/) and is licensed under ODbL. Exact source URLs, license link, geographic splits, and sampling parameters are versioned in `code/configs/ocm_sources.json`.
 
 ## GPU configuration
 

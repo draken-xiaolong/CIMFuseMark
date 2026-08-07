@@ -1,0 +1,28 @@
+{
+  "dataset": "Open City Model on AWS Open Data",
+  "license": "Open Data Commons Open Database License (ODbL)",
+  "license_url": "https://github.com/opencitymodel/opencitymodel#license",
+  "registry_url": "https://registry.opendata.aws/opencitymodel/",
+  "buildings_per_tile": 25,
+  "max_buildings_per_source": 400,
+  "sources": [
+    {
+      "id": "alabama_01011_000",
+      "region": "Alabama-01011",
+      "split": "train",
+      "url": "https://opencitymodel.s3.amazonaws.com/2019-feb/gml/Alabama/01011/Alabama-01011-000.zip"
+    },
+    {
+      "id": "california_06001_000",
+      "region": "California-06001",
+      "split": "validation",
+      "url": "https://opencitymodel.s3.amazonaws.com/2019-feb/gml/California/06001/California-06001-000.zip"
+    },
+    {
+      "id": "colorado_08001_000",
+      "region": "Colorado-08001",
+      "split": "test",
+      "url": "https://opencitymodel.s3.amazonaws.com/2019-feb/gml/Colorado/08001/Colorado-08001-000.zip"
+    }
+  ]
+}
