@@ -25,8 +25,15 @@ def bit_similarity(left: torch.Tensor, right: torch.Tensor) -> float:
     return float((left == right).float().mean().item())
 
 
-def encode(model, graph, relations, device):
-    return model.encode(*graph_tensors(graph, relations, device))
+def encode(model, graph, relations, device, relation_mode="typed", feature_mode="full"):
+    x, edge_index, edge_type = graph_tensors(graph, relations, device)
+    if relation_mode == "no_edges":
+        edge_index = edge_index[:, :0]
+        edge_type = edge_type[:0]
+    if feature_mode == "geometry":
+        x = x.clone()
+        x[:, 8:] = 0.0
+    return model.encode(x, edge_index, edge_type)
 
 
 def main() -> None:
@@ -36,6 +43,8 @@ def main() -> None:
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--manifest", default=str(DATA_ROOT / "benchmark_manifest.json"))
     parser.add_argument("--output-prefix", default="rgcn_demo")
+    parser.add_argument("--relation-mode", choices=("typed", "untyped", "no_edges"), default="typed")
+    parser.add_argument("--feature-mode", choices=("full", "geometry"), default="full")
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
     if args.epochs is not None: config["epochs"] = args.epochs
@@ -59,9 +68,12 @@ def main() -> None:
 
         relations = relation_vocabulary([record["clean"] for record in records] +
                                         [graph for record in records for _, graph in record["views"]])
+        if args.relation_mode == "untyped":
+            relations = {name: 0 for name in relations}
         input_dim = len(records[0]["clean"].nodes[0].features)
         model = CIMFuseRGCN(input_dim, int(config["hidden_dim"]), int(config["embedding_dim"]),
-                            len(relations), int(config["fingerprint_bits"]), seed).to(device)
+                            max(relations.values(), default=0) + 1,
+                            int(config["fingerprint_bits"]), seed).to(device)
         optimizer = torch.optim.AdamW(model.parameters(), lr=float(config["learning_rate"]),
                                       weight_decay=float(config["weight_decay"]))
         def in_split(record, split_name, family_key):
@@ -71,9 +83,11 @@ def main() -> None:
             model.train(); optimizer.zero_grad()
             clean_embeddings, view_embeddings = [], []
             for record in train:
-                clean_embedding = encode(model, record["clean"], relations, device)
+                clean_embedding = encode(model, record["clean"], relations, device,
+                                         args.relation_mode, args.feature_mode)
                 attack_name, view = record["views"][epoch % len(record["views"])]
-                view_embedding = encode(model, view, relations, device)
+                view_embedding = encode(model, view, relations, device,
+                                        args.relation_mode, args.feature_mode)
                 clean_embeddings.append(clean_embedding); view_embeddings.append(view_embedding)
             clean_stack = torch.stack(clean_embeddings); view_stack = torch.stack(view_embeddings)
             robust = (1.0 - F.cosine_similarity(clean_stack, view_stack)).mean()
@@ -107,10 +121,12 @@ def main() -> None:
                 clean_bits = {}
                 positives = []
                 for record in selected:
-                    embedding = encode(model, record["clean"], relations, device)
+                    embedding = encode(model, record["clean"], relations, device,
+                                       args.relation_mode, args.feature_mode)
                     clean_bits[record["id"]] = model.fingerprint(embedding)
                     for attack, graph in record["views"]:
-                        bits = model.fingerprint(encode(model, graph, relations, device))
+                        bits = model.fingerprint(encode(model, graph, relations, device,
+                                                        args.relation_mode, args.feature_mode))
                         positives.append(bit_similarity(clean_bits[record["id"]], bits))
                 negatives = []
                 related_scores = []
@@ -134,6 +150,7 @@ def main() -> None:
 
         output = {
             "config": config, "device": str(device), "relations": relations,
+            "relation_mode": args.relation_mode, "feature_mode": args.feature_mode,
             "model_digest": model_digest(model), "splits": evaluations,
             "warning": "Exploratory prototype; thresholds require validation on larger independent regions.",
         }

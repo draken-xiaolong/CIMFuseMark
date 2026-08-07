@@ -7,3 +7,6 @@ gpu.local.toml
 code/data/external_cache/
 code/data/ocm_tiles/
 code/data/ocm_manifest.json
+code/data/plateau_cache/
+code/data/plateau_tiles/
+code/data/plateau_manifest.json

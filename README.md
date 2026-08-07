@@ -90,6 +90,18 @@ On the Colorado split, using the same four attacks and the same 64 positive / 12
 
 See `docs/v0.4_ocm_geographic_benchmark_zh.md` for the protocol, results, limitations, and next experiment.
 
+## v0.5 rich-semantic PLATEAU corpus
+
+The v0.5 preparer selects LoD2 buildings with explicit semantic boundary surfaces from three 2025 Project PLATEAU meshes. Chiyoda, Minato, and Shinjuku are isolated as train, validation, and test regions. The current local corpus contains 24 tiles, 188 buildings, 9,659 boundary-surface nodes, and 48,889 graph edges with no parse failures.
+
+```bash
+PYTHONPATH=code python3 code/prepare_plateau_dataset.py
+PYTHONPATH=code python3 code/audit_graphs.py --manifest code/data/plateau_manifest.json --output code/results/plateau_graph_audit.json
+PYTHONPATH=code python3 code/train_rgcn_demo.py --manifest code/data/plateau_manifest.json --output-prefix rgcn_plateau --device cuda
+```
+
+The training script now supports `--relation-mode typed|untyped|no_edges` and `--feature-mode full|geometry` for controlled ablations. Exact sources, years, mesh codes, and license links are versioned in `code/configs/plateau_sources.json`; generated data remains ignored.
+
 ## What this demo proves (and does not prove)
 
 This is a feasibility check, not the final paper algorithm. It tests whether CityGML models can yield stable content fingerprints under translation, rotation, uniform scaling, coordinate noise, coordinate quantization, contiguous spatial cropping, attribute deletion, object reordering, and real XML object-subtree deletion. It does not yet compute exact surface-touch topology, execute real CityGML/CityJSON conversion, train on a representative city-scale corpus, or validate a deployment false-positive threshold.
