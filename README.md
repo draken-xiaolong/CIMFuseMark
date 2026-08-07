@@ -8,6 +8,8 @@ The demo parses CityGML 3.0 directly, extracts rotation/translation/scale-invari
 
 ```bash
 python3 code/run_demo.py
+python3 code/run_benchmark.py
+PYTHONPATH=code python3 -m unittest discover -s code/tests -v
 ```
 
 Results are written to `code/results/demo_results.json`. The implementation uses only the Python standard library.
@@ -28,17 +30,37 @@ Run on the bundled OGC LoD2 building sample (77 explicit coordinate triples):
 
 The transform robustness is encouraging, while the relatively high different-model similarity shows that uniqueness is the next problem to solve. These numbers are descriptive only; two models are not enough to estimate a threshold or false-positive rate.
 
+## v0.2 feasibility benchmark
+
+The benchmark adds 14 traceable OGC CityGML example files. Files believed to represent the same underlying example in different encodings, LoDs, or extensions share a `family` label and are excluded from different-source negatives.
+
+| Statistic | Result |
+|---|---:|
+| Same-source attack pairs | 98 |
+| Different-family pairs | 88 |
+| Same-source mean / 5th percentile | 0.995 / 0.980 |
+| Different-family mean / 95th percentile | 0.841 / 0.953 |
+| ROC AUC | 0.9946 |
+| Exploratory EER | 2.67% |
+| EER threshold | 0.9766 |
+| Observed false accepts at that threshold | 2 |
+| Related cross-version/LoD minimum | 0.551 |
+
+The threshold is selected and evaluated on the same small benchmark, so it is optimistic and must not be treated as a deployment threshold. The failures identify two next research problems: collisions between geometrically similar models and cross-LoD/cross-encoding consistency.
+
 ## What this demo proves (and does not prove)
 
-This is a feasibility check, not the final paper algorithm. It tests whether a small CityGML model can yield a stable content fingerprint under translation, rotation, uniform scaling, coordinate noise, and partial point deletion. It does not yet model surface connectivity, object-level deletion, cross-format conversion, learned representations, or a formal false-positive threshold.
+This is a feasibility check, not the final paper algorithm. It tests whether CityGML models can yield stable content fingerprints under translation, rotation, uniform scaling, coordinate noise, coordinate quantization, contiguous spatial cropping, and an approximate semantic-object deletion. It does not yet mutate complete XML object subtrees, model surface connectivity, execute real CityGML/CityJSON conversion, learn representations, or validate a held-out false-positive threshold.
 
 ## Data
 
-The sample is `Building_CityGML3.0_LOD2_with_several_attributes.gml` from the OGC CityGML 3.0 GML Encoding examples:
+All bundled samples are from the OGC CityGML 3.0 GML Encoding examples:
 
 https://github.com/opengeospatial/CityGML3.0-GML-Encoding/tree/main/resources/examples/Building
 
 The original repository states that the example files are intended for testing implementations of the OGC CityGML standard. Source and attribution are retained in `code/data/SOURCE.md`.
+
+The family labels in `code/data/benchmark_manifest.json` are research metadata curated from upstream identifiers and example structure. They are not authoritative identity labels from OGC.
 
 ## GPU configuration
 

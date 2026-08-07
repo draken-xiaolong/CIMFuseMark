@@ -8,3 +8,5 @@
 - Retrieved: 2026-08-08
 
 The file is included unchanged for reproducibility and standards-conformance testing.
+
+Additional benchmark examples under `benchmark/` are copied unchanged from module-specific folders in the same upstream repository. Their local names are shortened; `benchmark_manifest.json` records experiment identifiers and provisional family relationships.

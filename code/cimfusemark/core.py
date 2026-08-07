@@ -27,6 +27,11 @@ def extract_citygml(path: str | Path) -> tuple[list[Point], Counter[str]]:
         "Building", "BuildingPart", "WallSurface", "RoofSurface",
         "GroundSurface", "ClosureSurface", "Door", "Window",
         "BuildingRoom", "BuildingInstallation", "Storey",
+        "Bridge", "BridgePart", "BridgeRoom", "BridgeInstallation",
+        "Road", "Railway", "Square", "Track", "TrafficSpace",
+        "AuxiliaryTrafficSpace", "WaterBody", "LandUse", "ReliefFeature",
+        "Tunnel", "TunnelPart", "CityFurniture", "PlantCover",
+        "SolitaryVegetationObject", "CityObjectGroup",
     }
 
     for element in root.iter():
@@ -99,6 +104,11 @@ def invariant_features(points: Sequence[Point], semantics: Counter[str]) -> list
         "Building", "BuildingPart", "WallSurface", "RoofSurface",
         "GroundSurface", "ClosureSurface", "Door", "Window",
         "BuildingRoom", "BuildingInstallation", "Storey",
+        "Bridge", "BridgePart", "BridgeRoom", "BridgeInstallation",
+        "Road", "Railway", "Square", "Track", "TrafficSpace",
+        "AuxiliaryTrafficSpace", "WaterBody", "LandUse", "ReliefFeature",
+        "Tunnel", "TunnelPart", "CityFurniture", "PlantCover",
+        "SolitaryVegetationObject", "CityObjectGroup",
     ]
     semantic_total = sum(semantics.values()) or 1
     features.extend(semantics[name] / semantic_total for name in semantic_order)
@@ -157,4 +167,22 @@ def attack_points(points: Sequence[Point], attack: str, severity: float = 0.01, 
         kept = list(points)
         rng.shuffle(kept)
         return kept[: max(4, round(len(kept) * (1.0 - severity)))]
+    if attack == "spatial_crop":
+        # Delete a contiguous slice at the high-x side, closer to real local damage.
+        ordered = sorted(points, key=lambda point: point[0])
+        return ordered[: max(4, round(len(ordered) * (1.0 - severity)))]
+    if attack == "quantization":
+        xs, ys, zs = zip(*points)
+        diagonal = math.sqrt((max(xs)-min(xs))**2 + (max(ys)-min(ys))**2 + (max(zs)-min(zs))**2)
+        step = max(severity * diagonal, 1e-12)
+        return [(round(x / step) * step, round(y / step) * step, round(z / step) * step) for x, y, z in points]
     raise ValueError(f"Unknown attack: {attack}")
+
+
+def attack_semantics(semantics: Counter[str], severity: float = 0.1, seed: int = 7) -> Counter[str]:
+    """Simulate deletion of semantic objects without inventing new categories."""
+    rng = random.Random(seed)
+    expanded = [name for name, count in semantics.items() for _ in range(count)]
+    rng.shuffle(expanded)
+    remove_count = min(len(expanded), round(len(expanded) * severity))
+    return Counter(expanded[remove_count:])

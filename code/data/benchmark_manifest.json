@@ -1,0 +1,22 @@
+{
+  "source": "OGC CityGML 3.0 GML Encoding examples",
+  "upstream": "https://github.com/opengeospatial/CityGML3.0-GML-Encoding",
+  "retrieved": "2026-08-08",
+  "models": [
+    {"id": "ogc_lod2_attributes", "family": "deby_lod2_5744682", "path": "Building_CityGML3.0_LOD2_with_several_attributes.gml"},
+    {"id": "jefferson_lod1", "family": "jefferson", "path": "JeffersonBuilding_CityGML3.0_LOD1_with_xAL3_CommonTypes.gml"},
+    {"id": "building_units_storeys", "family": "building_units_storeys", "path": "benchmark/building_units_storeys.gml"},
+    {"id": "opera_lyon", "family": "opera_lyon", "path": "benchmark/opera_lyon.gml"},
+    {"id": "road_over_bridge", "family": "road_over_bridge", "path": "benchmark/road_over_bridge.gml"},
+    {"id": "parking_garage", "family": "parking_garage", "path": "benchmark/parking_garage.gml"},
+    {"id": "historical_succession", "family": "historical_succession", "path": "benchmark/historical_succession.gml"},
+    {"id": "local_crs", "family": "local_crs", "path": "benchmark/local_crs.gml"},
+    {"id": "simple_building", "family": "simple_building_series", "path": "benchmark/simple_building.gml"},
+    {"id": "roof_overhangs", "family": "simple_building_series", "path": "benchmark/roof_overhangs.gml"},
+    {"id": "nested_features", "family": "nested_features", "path": "benchmark/nested_features.gml"},
+    {"id": "building_and_garage", "family": "ogc_building_series", "path": "benchmark/building_and_garage.gml"},
+    {"id": "building_lod3", "family": "ogc_building_series", "path": "benchmark/building_lod3.gml"},
+    {"id": "dynamizer_building", "family": "deby_lod2_5744682", "path": "benchmark/dynamizer_building.gml"}
+  ],
+  "caveat": "Families are curated from upstream filenames and example structure. This is a feasibility benchmark, not a statistically representative CIM corpus."
+}
