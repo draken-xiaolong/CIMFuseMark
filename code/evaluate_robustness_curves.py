@@ -20,6 +20,8 @@ DATA_ROOT = ROOT / "data"
 
 DEFAULT_SWEEPS = {
     "object_delete": [0.05, 0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80],
+    "building_delete": [0.10, 0.20, 0.40, 0.60, 0.80],
+    "surface_delete": [0.10, 0.20, 0.40, 0.60, 0.80],
     "attribute_delete": [0.10, 0.20, 0.40, 0.60, 0.80],
     "quantization": [0.001, 0.005, 0.01, 0.02, 0.05],
     "rotation_z": [30.0, 60.0, 90.0, 120.0, 180.0],
@@ -46,6 +48,8 @@ def main() -> None:
     parser.add_argument("--split", default="test")
     parser.add_argument("--output", default=str(ROOT / "results" / "robustness_curves.json"))
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--attacks", nargs="+", choices=tuple(DEFAULT_SWEEPS),
+                        help="Only evaluate selected attack families")
     args = parser.parse_args()
 
     device = torch.device(args.device)
@@ -77,10 +81,11 @@ def main() -> None:
         curves = {}
         with tempfile.TemporaryDirectory(prefix="cimfusemark_curves_") as temporary:
             temporary_root = Path(temporary)
-            for attack, levels in DEFAULT_SWEEPS.items():
+            selected_sweeps = {name: DEFAULT_SWEEPS[name] for name in args.attacks} if args.attacks else DEFAULT_SWEEPS
+            for attack, levels in selected_sweeps.items():
                 points = []
                 for level in levels:
-                    scores, changed = [], []
+                    scores, changed, node_ratios, valid = [], [], [], 0
                     for item in selected:
                         source = (DATA_ROOT / item["path"]).resolve()
                         attacked_path = temporary_root / f"{item['id']}__{attack}_{level}.gml"
@@ -90,9 +95,12 @@ def main() -> None:
                             attacked = build_citygml_graph(attacked_path)
                             bits = encode(model, attacked, relations, device, relation_mode, feature_mode)
                             scores.append(bit_similarity(clean_bits[item["id"]], bits))
+                            node_ratios.append(len(attacked.nodes) / max(len(clean_graphs[item["id"]].nodes), 1))
+                            valid += 1
                         except ValueError:
                             # A destructively emptied model is an authentication failure, not a missing sample.
                             scores.append(0.0)
+                            node_ratios.append(0.0)
                         changed.append(int(mutation["changed_elements"]))
                     points.append({
                         "intensity": level, "models": len(scores),
@@ -100,6 +108,9 @@ def main() -> None:
                         "similarity_q05": quantile(scores, 0.05),
                         "similarity_minimum": min(scores),
                         "ber_mean": 1.0 - statistics.fmean(scores),
+                        "valid_graph_rate": valid / len(scores),
+                        "remaining_node_ratio_mean": statistics.fmean(node_ratios),
+                        "remaining_node_ratio_minimum": min(node_ratios),
                         "changed_elements_mean": statistics.fmean(changed),
                         "scores": scores,
                     })

@@ -35,6 +35,16 @@ class CityGMLGraphTests(unittest.TestCase):
             self.assertGreater(mutation["changed_elements"], 0)
             self.assertLess(len(attacked.nodes), len(self.graph.nodes))
 
+    def test_semantic_deletion_attacks_are_distinct_and_parseable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for attack in ("building_delete", "surface_delete"):
+                path = Path(directory) / f"{attack}.gml"
+                mutation = attack_citygml_xml(DATA, path, attack, 0.5)
+                attacked = build_citygml_graph(path)
+                self.assertGreaterEqual(len(attacked.nodes), 1)
+                self.assertGreater(mutation["candidate_elements"], 0)
+                self.assertLessEqual(len(attacked.nodes), len(self.graph.nodes))
+
 
 if __name__ == "__main__":
     unittest.main()
