@@ -45,6 +45,15 @@ class CityGMLGraphTests(unittest.TestCase):
                 self.assertGreater(mutation["candidate_elements"], 0)
                 self.assertLessEqual(len(attacked.nodes), len(self.graph.nodes))
 
+    def test_unseen_noise_and_sequential_attacks_are_parseable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for attack, severity in (("coordinate_noise", 0.001), ("sequential", 0.2)):
+                path = Path(directory) / f"{attack}.gml"
+                mutation = attack_citygml_xml(DATA, path, attack, severity)
+                attacked = build_citygml_graph(path)
+                self.assertGreater(len(attacked.nodes), 0)
+                self.assertGreater(mutation["changed_elements"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

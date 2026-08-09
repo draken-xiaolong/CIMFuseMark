@@ -8,5 +8,7 @@
   "margin_weight": 0.5,
   "anchor_weight": 0.02,
   "noise_weight": 0.2,
-  "embedding_noise_std": 0.003
+  "embedding_noise_std": 0.003,
+  "background_weight": 1.0,
+  "background_correlation_margin": 0.05
 }

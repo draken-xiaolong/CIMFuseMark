@@ -18,6 +18,21 @@ def _coordinate_elements(root: ET.Element) -> list[ET.Element]:
 def attack_citygml_xml(input_path: str | Path, output_path: str | Path, attack: str,
                        severity: float = 0.05, seed: int = 7) -> dict[str, object]:
     """Mutate a complete XML tree and write an independently parseable CityGML file."""
+    if attack == "sequential":
+        output_path = Path(output_path)
+        stages = (("rotation_z", 37.0), ("quantization", max(severity * 0.02, 0.001)),
+                  ("attribute_delete", min(severity, 0.8)),
+                  ("object_delete", min(severity, 0.7)))
+        current = Path(input_path); changed = 0; intermediates = []
+        for index, (stage, level) in enumerate(stages):
+            target = output_path if index + 1 == len(stages) else output_path.with_suffix(f".stage{index}.gml")
+            mutation = attack_citygml_xml(current, target, stage, level, seed + index)
+            changed += int(mutation["changed_elements"]); current = target
+            if target != output_path: intermediates.append(target)
+        for intermediate in intermediates:
+            intermediate.unlink(missing_ok=True)
+        return {"attack": attack, "severity": severity, "candidate_elements": None,
+                "changed_elements": changed, "output": str(output_path)}
     tree = ET.parse(input_path)
     root = tree.getroot()
     rng = random.Random(seed)
@@ -66,7 +81,7 @@ def attack_citygml_xml(input_path: str | Path, output_path: str | Path, attack: 
                 if shuffled != children:
                     parent[:] = shuffled
                     changed += 1
-    elif attack in {"translation", "scale", "rotation_z", "quantization"}:
+    elif attack in {"translation", "scale", "rotation_z", "quantization", "coordinate_noise"}:
         coordinates = _coordinate_elements(root)
         all_values = [float(value) for element in coordinates for value in element.text.split()]
         triples = list(zip(all_values[0::3], all_values[1::3], all_values[2::3]))
@@ -84,6 +99,9 @@ def attack_citygml_xml(input_path: str | Path, output_path: str | Path, attack: 
                     angle = math.radians(severity if severity else 37)
                     c, s = math.cos(angle), math.sin(angle)
                     x, y = c*x-s*y, s*x+c*y
+                elif attack == "coordinate_noise":
+                    sigma = severity * diagonal
+                    x, y, z = x + rng.gauss(0, sigma), y + rng.gauss(0, sigma), z + rng.gauss(0, sigma)
                 else:
                     step = max(severity * diagonal, 1e-12)
                     x, y, z = round(x/step)*step, round(y/step)*step, round(z/step)*step

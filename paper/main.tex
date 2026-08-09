@@ -1,0 +1,219 @@
+% !TeX program = xelatex
+\documentclass[UTF8,fontset=fandol,12pt]{ctexart}
+\usepackage[a4paper,margin=2.35cm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs,multirow,graphicx,float}
+\usepackage{xcolor,hyperref}
+\usepackage[numbers,sort&compress]{natbib}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\newcommand{\method}{CIMFuseMark}
+\newcommand{\todo}[1]{\textcolor{red}{[待补：#1]}}
+\title{\method：面向三维城市信息模型版权认证的\\语义图对比零水印框架}
+\author{作者信息待定\\单位信息待定}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+三维城市信息模型（City Information Modeling, CIM）以 CityGML 等开放格式联合表达建筑几何、语义对象与层级关系，具有生产成本高、易复制且不宜修改原始坐标的特点。现有三维零水印大多依赖顶点范数、球坐标偏度或径向分布等人工几何统计，虽然可在刚体变换下保持较高相似度，但几何相近模型容易产生高相关指纹，仅报告攻击前后相似度会掩盖误认证。本文提出 \method：首先将 Building、WallSurface、RoofSurface 等对象及其 bounded-by、part-of 等关系构建为多关系语义图；随后通过原始视图与多类攻击视图的多正样本对比学习、软比特一致性和最差视图尾部约束学习攻击不变量；最后冻结基础编码器，仅利用所有者提交的干净登记模型学习密钥化个性哈希投影，以协调鲁棒性与跨模型唯一性。本文在 Project PLATEAU 的地域隔离 CityGML 数据上设置旋转、量化、属性删除、整栋建筑删除、语义表面删除及连续复合攻击，并与四种传统三维零水印基线比较。8 个登记测试模型的闭集实验表明，个性化后登记内异源指纹 q95 从 0.814 降至 0.452；在混合对象删除20\%、整栋建筑删除40\%和语义表面删除40\%下均取得 AUC 1.000、EER 0。训练未见的0.5\%尺度坐标噪声和20\%连续复合攻击均取得 AUC 1.000。开放集实验同时表明，未登记模型的最大匹配仍可能偏高，说明登记内唯一性不能替代开放集校准。实验还揭示：高 NC 并不等价于可靠认证，传统径向融合适配方法虽具有接近 1 的同源相似度，其异源 q95 亦达到 1。本文据此主张三维 CIM 零水印应联合报告鲁棒性、唯一性与开放集阈值指标。
+\end{abstract}
+
+\noindent\textbf{关键词：}三维城市信息模型；CityGML；零水印；图神经网络；对比学习；版权认证
+
+\section{引言}
+数字孪生城市、规划审批与城市治理越来越依赖具有精确几何和丰富语义的三维城市模型。CityGML 不仅描述坐标和多边形，还组织建筑、边界面、门窗、房间以及对象之间的语义层级\cite{OGCCityGML3}。这类数据可以被无损复制、局部删除、格式转换或重新发布。嵌入式水印需要修改坐标、拓扑或变换系数，在测绘精度、模式约束和鲁棒性之间存在固有折衷\cite{WangSurvey2008}。零水印则从原始数据提取内容指纹并在外部登记，不改变载体，因而更适合高精度 CIM。
+
+Jiang 和 Kim 首次针对 CityGML 使用归一化顶点范数直方图构造零水印\cite{Jiang2018}。面向三维网格的后续研究引入多特征稳定顶点\cite{Wang2019}、球坐标偏度\cite{Lee2021}、球面积分不变量以及径向特征融合\cite{Hu2026}。这些方法具有明确的几何解释，但其设计目标主要是同一模型在攻击前后的特征稳定。当多个城市模型具有相似的建筑数量、径向分布或规则化外形时，人工统计容易生成高度相关的内容指纹。若实验只报告 normalized correlation（NC）或 bit similarity，就可能将“所有模型得到近似相同指纹”误判为鲁棒。
+
+另一方面，CityGML 的核心优势恰恰是语义与关系，而现有直接 CityGML 零水印基本只使用点坐标。图神经网络能够对非欧氏对象及其关系进行消息传递\cite{Kipf2017,Hamilton2017}，对比学习能够从同一对象的多种增强视图中学习不变量\cite{Chen2020}。然而，将语义图学习用于 CityGML/CIM 零水印时仍面临两个问题：一是强删除会改变节点与关系，二是统一基础模型不保证有限登记库内部的指纹间隔。
+
+针对上述问题，本文提出 \method。主要贡献如下：
+\begin{enumerate}
+  \item 提出面向 CityGML 的多关系语义图零水印表示，将对象几何、语义类型、属性统计与层级关系统一编码，并保持原始 CIM 不变。
+  \item 设计多攻击视图鲁棒学习目标，联合多正样本 NT-Xent、攻击前后软比特一致性、量化/平衡正则以及最差视图尾部损失。
+  \item 引入干净登记个性化哈希。基础编码器保持地域隔离，登记阶段只读取待保护模型的干净原件，为其分配密钥化平衡码字并优化投影，不读取正式攻击样本。
+  \item 建立同时覆盖同源稳定性与异源唯一性的评价协议，报告 AUC、EER、FAR/FRR 和异源 q95，并以统一 CityGML 攻击复现四种传统基线。
+\end{enumerate}
+
+\section{相关工作}
+\subsection{CityGML 与三维零水印}
+CityGML 3.0 以模块化模式描述城市对象、几何、语义和拓扑关系\cite{OGCCityGML3}。Jiang18 将顶点到质心的距离归一化并划分等宽区间，以区间计数是否高于均值生成 64-bit 水印\cite{Jiang2018}。该方法天然抵抗平移、统一缩放和顶点重排，但只编码全局径向统计。
+
+三维网格零水印研究提供了更多人工特征。Wang19 使用 OSVETA 稳定顶点、shape diameter function、顶点范数偏度和稳定顶点数量分布\cite{Wang2019}；Lee21 在球坐标分组中以角度偏度构造水印\cite{Lee2021}；Hu26 通过经验模态分解分段，融合显式/隐式径向特征并进行分段投票\cite{Hu2026}。这些算法原本假设三角网格连接，迁移到 CityGML 多边形和语义对象时需要明确适配边界。
+
+\subsection{三维深度水印与图表示学习}
+深度三维网格水印已经使用神经网络学习嵌入与提取\cite{WangDeepMesh2022,ZhuDeep3DMark2024}，但这些方法修改顶点，任务与零水印登记不同。2026 年的点云零水印进一步将图谱局部特征与 DGCNN 全局特征融合\cite{ZhangPointZW2026}，说明学习式特征有助于协调鲁棒性和区分性，但其输入不包含 CityGML 语义层级。
+
+关系图卷积为不同边类型学习独立变换，可表达 bounded-by 与 part-of 等关系；图对比学习则将同一模型的攻击视图视为多正样本。本文将两者用于 CIM 内容指纹，并通过 no-edge、untyped 和 geometry-only 消融区分语义节点特征与关系传播的贡献。
+
+\section{方法}
+\subsection{问题定义}
+设 CityGML 模型为 $M=(V,E,X)$，$V$ 为语义对象，$E$ 为类型化关系，$X\in\mathbb R^{|V|\times d}$ 为节点特征。密钥 $\kappa$ 下的编码器输出 $B$ 位指纹
+\begin{equation}
+ \bm b=F_{\theta,\kappa}(M)\in\{0,1\}^{B},\quad B=1024.
+\end{equation}
+对攻击 $T$ 与两个不同模型 $M_i,M_j$，分别定义
+\begin{equation}
+s^+=\operatorname{sim}(F(M),F(T(M))),\qquad
+s^-=\operatorname{sim}(F(M_i),F(M_j)),\quad i\neq j.
+\end{equation}
+本文采用归一化 Hamming 相似度
+\begin{equation}
+ \operatorname{sim}(\bm b_i,\bm b_j)=\frac{1}{B}\sum_{k=1}^{B}\mathbb I[b_{ik}=b_{jk}].
+\end{equation}
+可靠认证要求 $s^+$ 与 $s^-$ 可分，而非仅要求 $s^+$ 较高。
+
+\subsection{CityGML 多关系语义图}
+解析 XML 后，将 Building、BuildingPart、WallSurface、RoofSurface、GroundSurface、Door、Window 等对象构造为节点。父子层级和 CityGML 属性形成 directed parent/child、bounded-by/part-of 等关系，并加入反向边。节点特征共 19 维，包括相对质心、尺度归一化协方差谱、径向统计、点数、属性数、层级深度、边界角色及稳定类型哈希。坐标先减去模型中心，再除以包围盒对角线，因此平移和统一缩放不改变几何特征；当前 Z 轴旋转实验中协方差谱和径向统计保持不变。
+
+\subsection{关系图编码器}
+节点首先经线性层、LayerNorm 和 GELU 映射。第 $l$ 层关系卷积为
+\begin{equation}
+ \bm h_i^{(l+1)}=\bm W_0^{(l)}\bm h_i^{(l)}+
+ \sum_{r\in\mathcal R}\frac{1}{|\mathcal N_i^r|}
+ \sum_{j\in\mathcal N_i^r}\bm W_r^{(l)}\bm h_j^{(l)}.
+\end{equation}
+两层传播后，均值池化、最大池化和注意力池化拼接为图级表示，经读出网络得到单位化 embedding $\bm z\in\mathbb R^{256}$。
+
+\subsection{多视图鲁棒学习}
+每个训练模型包含一个干净视图和三个强制攻击族视图。攻击族按轮次轮换，包括对象删除、属性删除、坐标量化和旋转；对象删除采用 5\%--60\% 的课程强度。设第 $i$ 个模型的视图集合为 $\{\bm z_{iv}\}_{v=0}^{V}$。多正样本 NT-Xent 将同一模型的全部视图视为正样本，其余模型视为负样本：
+\begin{equation}
+ \mathcal L_{con}=-\frac{1}{N(V+1)}\sum_a\frac{1}{|P(a)|}
+ \sum_{p\in P(a)}\log\frac{\exp(\bm z_a^\top\bm z_p/\tau)}
+ {\sum_{q\neq a}\exp(\bm z_a^\top\bm z_q/\tau)}.
+\end{equation}
+固定密钥投影 $\bm R_\kappa$ 生成软比特
+\begin{equation}
+ \widetilde{\bm b}_{iv}=\tanh(\bm R_\kappa\bm z_{iv}/\tau_b).
+\end{equation}
+二值目标包含干净--攻击 MSE、跨 batch 比特平衡和量化损失。为避免均值掩盖极端攻击，分别选取距离最大的 34\% 视图计算 embedding tail 与 bit tail loss。另对不同训练模型的干净软比特正相关进行惩罚。总损失为
+\begin{equation}
+ \mathcal L=\mathcal L_{con}+0.7\mathcal L_{bin}
+ +0.8\mathcal L_{emb-tail}+0.8\mathcal L_{bit-tail}
+ +2.0\mathcal L_{sep}.
+\end{equation}
+
+\subsection{干净登记个性化哈希}
+基础模型学习跨地域攻击不变量，但固定随机投影不能保证所有者登记集合内部充分分离。登记时冻结编码器，为 $K$ 个干净登记模型生成平衡密钥码本 $C\in\{-1,1\}^{K\times B}$，每列正负码数尽量相等。只优化投影 $P$：
+\begin{equation}
+ \mathcal L_{reg}=\|\tanh(ZP^\top/\tau)-C\|_2^2
+ +\lambda_m[\gamma-C\odot ZP^\top]_+
+ +\lambda_a(1-\cos(P,R_\kappa))+\lambda_n\mathcal L_{noise}.
+\end{equation}
+$\mathcal L_{noise}$ 使用 embedding 空间的小幅独立高斯扰动，不使用正式 XML 攻击缓存。该阶段属于 transductive enrollment：基础编码器未见测试地域，但哈希投影见过待保护对象的干净原件，故实验必须分别报告 base 与 personalized。
+
+\section{实验设计}
+\subsection{数据与地域隔离}
+采用日本国土交通省 Project PLATEAU 2025 CityGML LoD2 建筑数据。首轮数据包含千代田、港区和新宿三个行政区，分别作为训练、验证和测试地域。每 8 栋具有 Wall/Roof/Ground 语义面的建筑构成一个瓦片，共 24 个瓦片、188 栋建筑、9853 个图节点和 48889 条边。扩展提取在相同三个源文件中获得 31 个瓦片、241 栋建筑；由于仍只有三个地域，扩展结果仅作稳定性补充，不能替代更多城市验证。
+
+\subsection{攻击与指标}
+攻击直接作用于完整 XML，随后重新解析构图。包括：Z 轴旋转 30--180 度；坐标量化为包围盒对角线的 0.1\%--5\%；属性删除 10\%--80\%；混合对象删除 5\%--80\%；整栋建筑删除和语义表面删除 10\%--80\%。另设置训练未见的尺度归一化高斯噪声，以及旋转、量化、属性删除、对象删除组成的连续复合攻击。删除后无法构图按认证失败计 0。
+
+除同源均值和 $q_{.05}$ 外，本文将同源分数作为正样本、不同干净模型之间的分数作为负样本，报告 ROC-AUC、EER 和固定阈值下 FRR。探索结果使用异源 $q_{.95}$ 展示唯一性；投稿终稿将由验证登记库固定阈值，并在测试库上报告 FAR/FRR。\todo{完成验证集固定阈值与 bootstrap 95\% CI。}
+
+\subsection{对比方法}
+Jiang18 为直接 CityGML 复现。Lee21 以 CityGML 点集按径向分组计算球坐标极角偏度。Wang19 原方法需要 OSVETA 和 SDF，本文 CityGML-adapted 版本以径向局部稳定性、弦长和高度分布替代。Hu26-adapted 使用排序径向信号的多尺度残差近似原 EMD 显式/隐式特征。后两者不宣称逐字复现。完整方法同时报告 base 与 personalized。
+
+\section{结果与分析}
+\subsection{语义与关系消融}
+\begin{table}[H]\centering
+\caption{PLATEAU 新宿测试区上的首轮消融。}\label{tab:ablation}
+\begin{tabular}{lcc}
+\toprule 方法 & AUC & EER \\
+\midrule 无训练图指纹 & 0.9827 & 10.04\%\\
+typed R-GCN & 0.9944 & 3.35\%\\
+untyped GNN & 0.9939 & 3.35\%\\
+no-edge 节点集合网络 & \textbf{0.9955} & 3.35\%\\
+geometry-only R-GCN & 0.9688 & 6.70\%\\
+\bottomrule
+\end{tabular}
+\end{table}
+完整特征明显优于 geometry-only，支持对象类型、边界角色、属性数量与层级深度有效；但 typed 没有优于 no-edge，当前数据不支持“关系类型传播带来提升”的强结论。原因可能是 LoD2 建筑大多呈 Building--Surface 重复星形结构。本文因此将贡献表述为“语义图表示”，并把更丰富关系数据列为必要后续实验。
+
+\subsection{个性化与认证性能}
+base v0.7 在测试区的异源均值/q95/最大值为 0.581/0.814/0.910。干净登记个性化后降至 0.430/0.452/0.469，说明身份分离显著改善。
+\begin{table}[H]\centering
+\caption{个性化 \method 的攻击认证结果。}\label{tab:main}
+\begin{tabular}{lrrrr}
+\toprule 攻击 & 强度 & 同源均值/$q_{.05}$ & AUC & EER\\
+\midrule 混合对象删除 & 20\% & 0.896/0.699 & 1.000 & 0\\
+混合对象删除 & 30\% & 0.721/0.468 & 0.975 & 13.39\%\\
+整栋建筑删除 & 40\% & 0.807/0.541 & 1.000 & 0\\
+整栋建筑删除 & 60\% & 0.663/0.434 & 0.875 & 13.39\%\\
+语义表面删除 & 40\% & 0.778/0.555 & 1.000 & 0\\
+语义表面删除 & 60\% & 0.587/0.334 & 0.750 & 25.00\%\\
+属性删除 & 80\% & 0.990/0.950 & 1.000 & 0\\
+坐标量化 & 5\% & 0.920/0.679 & 1.000 & 0\\
+Z轴旋转 & 180度 & 1.000/1.000 & 1.000 & 0\\
+\bottomrule
+\end{tabular}
+\end{table}
+对象删除20\%和独立语义删除40\%是当前较可信工作区间；60\%--80\%应视为压力测试。追求极端删除下恒定高相似度会使表示忽略身份信息，从而增加误认证。
+
+\subsection{传统零水印对比}
+\begin{table}[H]\centering
+\caption{传统方法的唯一性及关键攻击 AUC/EER。}\label{tab:baseline}
+\resizebox{\textwidth}{!}{\begin{tabular}{lrrrrr}
+\toprule 方法 & 异源$q_{.95}$ & 混合删20\% & 整栋删40\% & 表面删40\% & 量化5\%\\
+\midrule Jiang18 & 0.891 & 0.783/28.57\% & 0.694/34.82\% & 0.734/34.82\% & 0.500/53.57\%\\
+Lee21 adapted & 0.588 & 0.583/50.00\% & 0.386/59.82\% & 0.473/50.00\% & 0.641/40.18\%\\
+Wang19 adapted & 0.913 & 0.844/23.21\% & 0.665/32.14\% & 0.743/32.14\% & 0.609/44.64\%\\
+Hu26 adapted & 1.000 & 0.670/26.79\% & 0.634/33.04\% & 0.714/26.79\% & 0.598/33.04\%\\
+\method-personalized & \textbf{0.452} & \textbf{1.000/0} & \textbf{1.000/0} & \textbf{1.000/0} & \textbf{1.000/0}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+Hu26-adapted 的同源相似度接近 1，但异源 q95 也为 1，说明其指纹近乎坍缩。Jiang18 与 Wang19 同样具有高异源尾部。Lee21 唯一性相对较好，但删除攻击使指纹快速失稳。该结果支持联合优化稳定性和唯一性的必要性。
+
+\subsection{训练未见攻击}
+\begin{table}[H]\centering
+\caption{个性化模型在训练未见攻击下的结果。}\label{tab:unseen}
+\begin{tabular}{lrrrr}
+\toprule 攻击 & 强度 & 同源均值/$q_{.05}$ & AUC & EER\\
+\midrule 坐标高斯噪声 & 0.1\% & 0.930/0.792 & 1.000 & 0\\
+坐标高斯噪声 & 0.5\% & 0.937/0.726 & 1.000 & 0\\
+连续复合攻击 & 10\% & 0.897/0.629 & 1.000 & 0\\
+连续复合攻击 & 20\% & 0.843/0.545 & 1.000 & 0\\
+连续复合攻击 & 40\% & 0.747/0.415 & 0.871 & 13.39\%\\
+连续复合攻击 & 60\% & 0.643/0.363 & 0.759 & 25.00\%\\
+\bottomrule
+\end{tabular}
+\end{table}
+模型没有在训练阶段观察坐标高斯噪声或连续复合攻击缓存。弱至中等噪声能够泛化，复合强度超过20\%后开始退化。
+
+\subsection{开放集阈值审计}
+闭集个性化只优化8个登记对象之间的码距。以8个未登记港区模型分别查询8个新宿登记项时，64个跨集配对的平均相似度为0.499，但每个查询的最大匹配均值达到0.818，最大值为0.921；按最大匹配 q95 校准的开放集阈值为0.908。该阈值下混合删除20\%的 FRR 为37.5\%，明显高于闭集登记阈值结果。这一负结果说明当前个性化投影更接近登记库判别器，尚不能保证未知模型的开放集拒识。本文因此将 AUC 1.0 明确限定为登记库闭集认证，不将其外推为开放世界性能。训练地域背景负样本正则的初步版本仅将开放集阈值降至0.897，未根治问题。后续需要显式 open-set energy/margin 目标、更大背景库和独立第二校准地域。
+
+\subsection{随机种子稳定性}
+采用2026、2027和2028三个随机种子分别完成800轮基础训练、干净登记个性化和攻击评估。表~\ref{tab:seeds} 报告均值与样本标准差。
+\begin{table}[H]\centering
+\caption{三随机种子闭集认证结果（均值$\pm$标准差）。}\label{tab:seeds}
+\begin{tabular}{lrrr}
+\toprule 攻击 & 强度 & AUC & EER\\
+\midrule 混合对象删除 & 20\% & $1.000\pm0.000$ & $0.000\pm0.000$\\
+混合对象删除 & 40\% & $0.867\pm0.113$ & $0.167\pm0.073$\\
+整栋建筑删除 & 40\% & $0.975\pm0.043$ & $0.045\pm0.077$\\
+语义表面删除 & 40\% & $0.961\pm0.067$ & $0.045\pm0.077$\\
+坐标量化 & 5\% & $0.999\pm0.003$ & $0.006\pm0.010$\\
+\bottomrule
+\end{tabular}
+\end{table}
+20\%混合删除和5\%量化对随机初始化稳定；40\%混合删除波动明显，说明单次 AUC 不能代表稳定性能。整栋/表面删除40\%总体较强，但仍受一个种子的尾部样本影响。
+
+\subsection{待完成的投稿级验证}
+首稿实验仍受三个地域和 8 个登记对象限制。提交前需完成：bootstrap 置信区间；登记规模 8/20/50/100 的码本容量实验；更多 PLATEAU 城市、多 LoD 和 BuildingPart/Room/道路/桥梁关系；PointNet/DGCNN 学习式点云基线；独立背景城市上的开放集阈值学习。\todo{补充新城市、登记规模和学习式点云基线。}
+
+\section{讨论}
+\subsection{鲁棒性与唯一性的权衡}
+实验显示，零水印不能用单一 NC 衡量。若所有输入都映射到相同码字，则任何攻击的同源 NC 都可达到 1，却完全没有版权识别能力。身份分离损失改善了 base 模型唯一性，而注册个性化进一步降低登记集合内部阈值，使强删除下较低的绝对相似度仍可被正确认证。这种设计符合零水印实际流程：所有者在登记时拥有干净原件，认证时只需比较查询指纹与登记证据。
+
+\subsection{适用边界与威胁模型}
+本文面向保持部分内容的编辑攻击，不保证当 80\% 以上对象被删除、剩余模型已无法代表原作品时仍认证成功。攻击者若获知私有投影密钥并针对模型优化，可能实施自适应碰撞攻击；当前实验未覆盖密钥泄露、码本推断和串谋，实际系统应将投影和登记证据保存在受控环境。个性化结果是 transductive enrollment，不应与完全 inductive 的跨区域 base 结果混为一谈。
+
+\section{结论}
+本文提出面向 CityGML/CIM 的语义图对比零水印框架 \method。模型通过多攻击视图学习稳定表示，通过异源分离和干净登记个性化建立身份边界。现有实验表明，传统人工径向特征容易出现“高同源同时高异源”，而 \method-personalized 在多个中等强度删除、属性编辑、量化和旋转攻击下获得更好的认证可分性。当前结论支持学习式语义表征与注册个性化的有效性，但关系类型传播优势和跨城市规模泛化仍需更多数据验证。
+
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+\end{document}

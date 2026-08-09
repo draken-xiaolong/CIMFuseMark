@@ -126,16 +126,18 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default=str(ROOT / "configs" / "plateau_sources.json"))
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--manifest-name", default="plateau_manifest.json")
+    parser.add_argument("--output-subdir", default="plateau_tiles")
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
-    manifest_path = DATA_ROOT / "plateau_manifest.json"
+    manifest_path = DATA_ROOT / args.manifest_name
     if manifest_path.exists() and not args.force:
         existing = json.loads(manifest_path.read_text(encoding="utf-8"))
         if all((DATA_ROOT / item["path"]).exists() for item in existing["models"]):
             print(json.dumps(existing["summary"], indent=2)); return
 
     cache = DATA_ROOT / "plateau_cache"
-    output_root = DATA_ROOT / "plateau_tiles"
+    output_root = DATA_ROOT / args.output_subdir
     models, sources = [], []
     for source in config["sources"]:
         source_path = cache / f"{source['id']}.gml"

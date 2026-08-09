@@ -10,3 +10,13 @@ code/data/ocm_manifest.json
 code/data/plateau_cache/
 code/data/plateau_tiles/
 code/data/plateau_manifest.json
+code/data/plateau_expanded_manifest.json
+code/data/plateau_expanded_tiles/
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out
+paper/*.xdv

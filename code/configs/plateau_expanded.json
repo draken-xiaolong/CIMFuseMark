@@ -1,0 +1,26 @@
+{
+  "dataset": "Project PLATEAU CityGML expanded benchmark",
+  "catalog_api": "https://api.plateauview.mlit.go.jp/datacatalog/citygml",
+  "license_url": "https://www.mlit.go.jp/plateau/site-policy/",
+  "specification": "PLATEAU Standard Product Specification 5.0",
+  "buildings_per_tile": 8,
+  "max_rich_buildings_per_source": 192,
+  "minimum_boundary_nodes": 3,
+  "sources": [
+    {
+      "id": "chiyoda_53394519", "city_code": "13101", "region": "Tokyo Chiyoda",
+      "mesh_code": "53394519", "year": 2025, "split": "train",
+      "url": "https://assets.cms.plateau.reearth.io/assets/5d/dc07c5-ace7-465a-9c99-53f6d78f6164/13101_chiyoda-ku_pref_2025_citygml_1_op/udx/bldg/53394519_bldg_6697_op.gml"
+    },
+    {
+      "id": "minato_53393640", "city_code": "13103", "region": "Tokyo Minato",
+      "mesh_code": "53393640", "year": 2025, "split": "validation",
+      "url": "https://assets.cms.plateau.reearth.io/assets/ea/d75459-6d62-4a1f-8081-317603bd5f8d/13103_minato-ku_pref_2025_citygml_1_op/udx/bldg/53393640_bldg_6697_op.gml"
+    },
+    {
+      "id": "shinjuku_53394517", "city_code": "13104", "region": "Tokyo Shinjuku",
+      "mesh_code": "53394517", "year": 2025, "split": "test",
+      "url": "https://assets.cms.plateau.reearth.io/assets/84/48ebed-93d8-4196-bdda-e1db9590d3d1/13104_shinjuku-ku_pref_2025_citygml_1_op/udx/bldg/53394517_bldg_6697_op.gml"
+    }
+  ]
+}

@@ -24,6 +24,7 @@ def main() -> None:
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--split", default="test", help="Clean models enrolled in the registration database")
+    parser.add_argument("--background-split", help="Optional clean non-enrolled background split for open-set separation")
     parser.add_argument("--config", default=str(ROOT / "configs" / "personalize_hash.json"))
     parser.add_argument("--output", default=str(ROOT / "results" / "rgcn_personalized.pt"))
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
@@ -35,6 +36,8 @@ def main() -> None:
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
     manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
     selected = [item for item in manifest["models"] if item.get("split") == args.split]
+    background = [item for item in manifest["models"] if item.get("split") == args.background_split] \
+        if args.background_split else []
     if len(selected) < 2:
         raise ValueError("Personalization needs at least two registered CIM models")
     graphs = {item["id"]: build_citygml_graph((DATA_ROOT / item["path"]).resolve()) for item in selected}
@@ -48,6 +51,11 @@ def main() -> None:
     with torch.no_grad():
         embeddings = torch.stack([model.encode(*graph_tensors(graphs[item["id"]], relations, device))
                                   for item in selected])
+        background_embeddings = None
+        if background:
+            background_embeddings = torch.stack([
+                model.encode(*graph_tensors(build_citygml_graph((DATA_ROOT / item["path"]).resolve()),
+                                                  relations, device)) for item in background])
 
     registration_seed = int(base_config["seed"]) + int(config["seed_offset"])
     targets = keyed_codebook(len(selected), int(base_config["fingerprint_bits"]),
@@ -70,15 +78,22 @@ def main() -> None:
         noisy_soft = torch.tanh((noisy_embeddings @ normalized_projection.T) /
                                 float(config["temperature"]))
         noise_loss = (noisy_soft - soft.detach()).square().mean()
+        background_loss = torch.zeros((), device=device)
+        if background_embeddings is not None:
+            background_soft = torch.tanh((background_embeddings @ normalized_projection.T) /
+                                         float(config["temperature"]))
+            correlations = background_soft @ targets.T / targets.shape[1]
+            background_loss = F.relu(correlations - float(config["background_correlation_margin"])).square().mean()
         loss = (float(config["code_weight"]) * code_loss +
                 float(config["margin_weight"]) * margin_loss +
                 float(config["anchor_weight"]) * anchor_loss +
-                float(config["noise_weight"]) * noise_loss)
+                float(config["noise_weight"]) * noise_loss +
+                float(config.get("background_weight", 0.0)) * background_loss)
         loss.backward(); optimizer.step()
         with torch.no_grad(): projection.copy_(F.normalize(projection, dim=1))
         last = {"step": step + 1, "loss": float(loss.detach()), "code": float(code_loss.detach()),
                 "margin": float(margin_loss.detach()), "anchor": float(anchor_loss.detach()),
-                "noise": float(noise_loss.detach())}
+                "noise": float(noise_loss.detach()), "background": float(background_loss.detach())}
         if step == 0 or step + 1 == int(config["steps"]) or (step + 1) % 200 == 0:
             print(json.dumps(last))
 
@@ -90,6 +105,7 @@ def main() -> None:
     registration = {
         "protocol": "clean-only registered-model hash personalization",
         "split": args.split, "registered_ids": [item["id"] for item in selected],
+        "background_split": args.background_split, "background_models": len(background),
         "registered_ids_digest": hashlib.sha256("\n".join(item["id"] for item in selected).encode()).hexdigest()[:16],
         "config": config, "last_loss": last,
         "registered_negative_mean": float(off_diagonal.mean()),

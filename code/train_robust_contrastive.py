@@ -38,11 +38,14 @@ def main() -> None:
     parser.add_argument("--manifest", default=str(DATA_ROOT / "plateau_manifest.json"))
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--epochs", type=int)
+    parser.add_argument("--seed", type=int)
     parser.add_argument("--output-prefix", default="rgcn_plateau_robust")
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
     if args.epochs is not None:
         config["epochs"] = args.epochs
+    if args.seed is not None:
+        config["seed"] = args.seed
     seed = int(config["seed"])
     random.seed(seed); torch.manual_seed(seed)
     device = torch.device(args.device)
