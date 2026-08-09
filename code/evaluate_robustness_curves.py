@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import statistics
 import tempfile
@@ -13,7 +14,7 @@ import torch
 
 from cimfusemark import attack_citygml_xml, build_citygml_graph
 from cimfusemark.rgcn import CIMFuseRGCN, graph_tensors
-from run_benchmark import quantile
+from run_benchmark import auc_from_scores, eer_from_scores, quantile
 
 ROOT = Path(__file__).resolve().parent
 DATA_ROOT = ROOT / "data"
@@ -78,6 +79,9 @@ def main() -> None:
         clean_bits = {item["id"]: encode(model, clean_graphs[item["id"]], relations, device,
                                                 relation_mode, feature_mode)
                       for item in selected}
+        negative_scores = [bit_similarity(clean_bits[left["id"]], clean_bits[right["id"]])
+                           for left, right in itertools.combinations(selected, 2)]
+        rejection_threshold = quantile(negative_scores, 0.95) if negative_scores else None
         curves = {}
         with tempfile.TemporaryDirectory(prefix="cimfusemark_curves_") as temporary:
             temporary_root = Path(temporary)
@@ -102,6 +106,10 @@ def main() -> None:
                             scores.append(0.0)
                             node_ratios.append(0.0)
                         changed.append(int(mutation["changed_elements"]))
+                    authentication = ({"auc": auc_from_scores(scores, negative_scores),
+                                       **eer_from_scores(scores, negative_scores),
+                                       "frr_at_negative_q95": sum(score < rejection_threshold for score in scores) / len(scores)}
+                                      if negative_scores else {})
                     points.append({
                         "intensity": level, "models": len(scores),
                         "similarity_mean": statistics.fmean(scores),
@@ -113,6 +121,7 @@ def main() -> None:
                         "remaining_node_ratio_minimum": min(node_ratios),
                         "changed_elements_mean": statistics.fmean(changed),
                         "scores": scores,
+                        **authentication,
                     })
                 curves[attack] = points
 
@@ -122,6 +131,10 @@ def main() -> None:
             "split": args.split, "models": len(selected), "device": str(device),
             "relation_mode": relation_mode, "feature_mode": feature_mode,
             "fingerprint_bits": int(config["fingerprint_bits"]),
+            "negative_pairs": len(negative_scores),
+            "negative_mean": statistics.fmean(negative_scores) if negative_scores else None,
+            "negative_q95": rejection_threshold,
+            "negative_maximum": max(negative_scores) if negative_scores else None,
         },
         "curves": curves,
         "warning": "Attack-specific similarity curves; thresholds are not recalibrated at each intensity.",
@@ -131,7 +144,11 @@ def main() -> None:
     output_path.write_text(json.dumps(output, indent=2), encoding="utf-8")
     compact = {attack: [{"intensity": point["intensity"],
                          "mean": round(point["similarity_mean"], 6),
-                         "q05": round(point["similarity_q05"], 6)} for point in points]
+                         "q05": round(point["similarity_q05"], 6),
+                         "auc": round(point["auc"], 6) if "auc" in point else None,
+                         "eer": round(point["eer"], 6) if "eer" in point else None,
+                         "frr_at_negative_q95": round(point["frr_at_negative_q95"], 6)
+                         if "frr_at_negative_q95" in point else None} for point in points]
                for attack, points in curves.items()}
     print(json.dumps(compact, indent=2))
 

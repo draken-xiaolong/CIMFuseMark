@@ -5,7 +5,8 @@ import torch
 
 from cimfusemark import build_citygml_graph
 from cimfusemark.rgcn import CIMFuseRGCN, graph_tensors, relation_vocabulary
-from cimfusemark.robust_losses import embedding_tail_loss, multi_positive_nt_xent, robust_bit_loss
+from cimfusemark.robust_losses import (bit_separation_loss, embedding_tail_loss,
+                                       multi_positive_nt_xent, robust_bit_loss)
 
 DATA = Path(__file__).parents[1] / "data" / "Building_CityGML3.0_LOD2_with_several_attributes.gml"
 
@@ -30,6 +31,13 @@ class RGCNTests(unittest.TestCase):
         stability, balance, quantization, tail = robust_bit_loss(soft)
         for value in (stability, balance, quantization, tail):
             self.assertTrue(torch.isfinite(value))
+
+    def test_bit_separation_penalizes_correlated_codes(self):
+        codes = torch.tensor([[1.0, 1.0, -1.0, -1.0],
+                              [1.0, 1.0, -1.0, -1.0]])
+        opposite = codes.clone(); opposite[1] *= -1
+        self.assertGreater(float(bit_separation_loss(codes)),
+                           float(bit_separation_loss(opposite)))
 
 
 if __name__ == "__main__":

@@ -13,7 +13,8 @@ import torch
 
 from cimfusemark import attack_citygml_xml, build_citygml_graph
 from cimfusemark.rgcn import CIMFuseRGCN, graph_tensors, model_digest, relation_vocabulary
-from cimfusemark.robust_losses import embedding_tail_loss, multi_positive_nt_xent, robust_bit_loss
+from cimfusemark.robust_losses import (bit_separation_loss, embedding_tail_loss,
+                                       multi_positive_nt_xent, robust_bit_loss)
 
 ROOT = Path(__file__).resolve().parent
 DATA_ROOT = ROOT / "data"
@@ -112,16 +113,20 @@ def main() -> None:
             stability, balance, quantization, bit_tail = robust_bit_loss(
                 soft_bits, float(config["tail_fraction"]))
             embedding_tail = embedding_tail_loss(embeddings, float(config["tail_fraction"]))
+            bit_separation = bit_separation_loss(
+                soft_bits[:, 0], float(config["bit_separation_margin"]))
             binary = stability + float(config["balance_weight"]) * balance + \
                      float(config["quantization_weight"]) * quantization
             loss = (float(config["contrastive_weight"]) * contrastive +
                     float(config["binary_weight"]) * binary +
                     float(config["embedding_tail_weight"]) * embedding_tail +
-                    float(config["bit_tail_weight"]) * bit_tail)
+                    float(config["bit_tail_weight"]) * bit_tail +
+                    float(config["bit_separation_weight"]) * bit_separation)
             loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); optimizer.step()
             row = {"epoch": epoch + 1, "loss": float(loss.detach()), "contrastive": float(contrastive.detach()),
                    "bit_stability": float(stability.detach()), "embedding_tail": float(embedding_tail.detach()),
-                   "bit_tail": float(bit_tail.detach()), "families": forced}
+                   "bit_tail": float(bit_tail.detach()), "bit_separation": float(bit_separation.detach()),
+                   "families": forced}
             if epoch == 0 or epoch + 1 == epochs or (epoch + 1) % 50 == 0:
                 print(json.dumps(row))
             if (epoch + 1) % 10 == 0 or epoch + 1 == epochs:

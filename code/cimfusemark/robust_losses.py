@@ -46,3 +46,17 @@ def embedding_tail_loss(embeddings: torch.Tensor, tail_fraction: float = 0.34) -
     distances = 1.0 - F.cosine_similarity(embeddings[:, 1:], clean.expand_as(embeddings[:, 1:]), dim=2)
     tail_count = max(1, math.ceil(distances.shape[1] * tail_fraction))
     return distances.topk(tail_count, dim=1).values.mean()
+
+
+def bit_separation_loss(clean_soft_bits: torch.Tensor, margin: float = 0.0) -> torch.Tensor:
+    """Penalize positive correlation between fingerprints of different models.
+
+    A correlation at or below zero corresponds to an expected Hamming similarity
+    no greater than 0.5. Normalization prevents trivially shrinking soft bits.
+    """
+    normalized = F.normalize(clean_soft_bits, dim=1)
+    correlations = normalized @ normalized.T
+    mask = ~torch.eye(len(clean_soft_bits), dtype=torch.bool, device=clean_soft_bits.device)
+    if not bool(mask.any()):
+        return torch.zeros((), device=clean_soft_bits.device)
+    return F.relu(correlations[mask] - margin).square().mean()
