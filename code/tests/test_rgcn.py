@@ -5,6 +5,7 @@ import torch
 
 from cimfusemark import build_citygml_graph
 from cimfusemark.rgcn import CIMFuseRGCN, graph_tensors, relation_vocabulary
+from cimfusemark.robust_losses import embedding_tail_loss, multi_positive_nt_xent, robust_bit_loss
 
 DATA = Path(__file__).parents[1] / "data" / "Building_CityGML3.0_LOD2_with_several_attributes.gml"
 
@@ -18,6 +19,17 @@ class RGCNTests(unittest.TestCase):
         self.assertEqual(tuple(embedding.shape), (24,))
         self.assertTrue(torch.isfinite(embedding).all())
         self.assertEqual(tuple(model.fingerprint(embedding).shape), (32,))
+
+    def test_robust_losses_prefer_matching_views(self):
+        clean = torch.nn.functional.normalize(torch.randn(3, 8), dim=1)
+        matching = clean[:, None, :].repeat(1, 3, 1)
+        perturbed = matching.clone(); perturbed[:, 1:] = torch.roll(clean, 1, 0)[:, None, :]
+        self.assertLess(float(multi_positive_nt_xent(matching)), float(multi_positive_nt_xent(perturbed)))
+        self.assertAlmostEqual(float(embedding_tail_loss(matching)), 0.0, places=6)
+        soft = torch.tanh(torch.randn(3, 3, 16))
+        stability, balance, quantization, tail = robust_bit_loss(soft)
+        for value in (stability, balance, quantization, tail):
+            self.assertTrue(torch.isfinite(value))
 
 
 if __name__ == "__main__":
