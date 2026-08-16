@@ -104,6 +104,12 @@ The training script now supports `--relation-mode typed|untyped|no_edges` and `-
 
 The first RTX 4090 run gives the following geographically held-out Shinjuku results: full typed R-GCN AUC 0.9944 / EER 3.35%, geometry-only AUC 0.9688 / EER 6.70%, untyped AUC 0.9939 / EER 3.35%, and no-edge AUC 0.9955 / EER 3.35%. Thus semantic node features help, but this corpus does not yet demonstrate a benefit from relation-aware message passing; the repeated building-to-surface star topology is likely too regular.
 
+## v0.9 Japan-only expanded PLATEAU experiment
+
+The expanded Japan-only experiment uses 31 LoD2 CityGML tiles and 241 buildings. Chiyoda (12 tiles), Minato (8), and Shinjuku (11) remain geographically isolated train, validation, and test regions. A robust 1024-bit typed R-GCN was trained for 800 epochs on an RTX 4090 and evaluated on all 11 unseen Shinjuku tiles.
+
+Rotation through 180 degrees and 80% attribute deletion retain AUC 1.0 / EER 0. Ten-percent building deletion obtains AUC 0.997 / EER 1.82%, while 40% building deletion falls to AUC 0.945 / EER 18.18%. Mixed object deletion, semantic-surface deletion, and sequential attacks deteriorate strongly at high intensity, so 60%--80% structural deletion is a stress test rather than a supported operating range. See `docs/v0.9_japan_plateau_expanded_zh.md` for the complete protocol and fixed-threshold results.
+
 ## What this demo proves (and does not prove)
 
 This is a feasibility check, not the final paper algorithm. It tests whether CityGML models can yield stable content fingerprints under translation, rotation, uniform scaling, coordinate noise, coordinate quantization, contiguous spatial cropping, attribute deletion, object reordering, and real XML object-subtree deletion. It does not yet compute exact surface-touch topology, execute real CityGML/CityJSON conversion, train on a representative city-scale corpus, or validate a deployment false-positive threshold.
