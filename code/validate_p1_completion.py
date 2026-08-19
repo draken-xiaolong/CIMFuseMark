@@ -44,14 +44,13 @@ def main() -> None:
         if set(curve_report["curves"]) != set(open_report["fixed_threshold_attacks"]):
             errors.append("core/open-set attack keys differ")
         if "far_5pct" not in open_report["open_set"].get("thresholds", {}): errors.append("missing frozen FAR=5% threshold")
-        if not reuse:
-            training = root / f"p1_{identifier}_training.json"
-            if not training.exists(): errors.append("missing training report")
-            else:
-                training_report = load(training)
-                if int(training_report["config"].get("epochs", 0)) != 800: errors.append("training epochs != 800")
-                expected_seed = int(experiment.get("seed", 2026))
-                if int(training_report["config"].get("seed", -1)) != expected_seed: errors.append("training seed mismatch")
+        training = root / f"{reuse or 'p1_' + identifier}_training.json"
+        if not training.exists(): errors.append("missing training report")
+        else:
+            training_report = load(training)
+            if int(training_report["config"].get("epochs", 0)) != 800: errors.append("training epochs != 800")
+            expected_seed = int(experiment.get("seed", 2026))
+            if int(training_report["config"].get("seed", -1)) != expected_seed: errors.append("training seed mismatch")
         row = {"id": identifier, "group": experiment["group"], "checkpoint": str(checkpoint),
                "curves": str(curves), "open_set": str(opened), "status": "failed" if errors else "complete"}
         if errors: row["errors"] = errors; failures.append(row)

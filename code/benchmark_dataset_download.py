@@ -27,6 +27,7 @@ def main() -> None:
     destination.mkdir(parents=True, exist_ok=True)
     config = json.loads(Path(args.config).read_text(encoding="utf-8")); rows = []
     aria2 = shutil.which("aria2c")
+    curl = shutil.which("curl")
     def fetch(source: dict) -> dict:
         suffix = ".zip" if source.get("kind") == "archive" else Path(source["url"]).suffix or ".gml"
         target = destination / f"{source['id']}{suffix}"
@@ -36,6 +37,10 @@ def main() -> None:
                             "--file-allocation=none", f"--max-connection-per-server={args.connections}",
                             f"--split={args.connections}", f"--dir={destination}", f"--out={target.name}", source["url"]],
                            check=True)
+        elif curl:
+            subprocess.run([curl, "--fail", "--location", "--silent", "--show-error",
+                            "--retry", "10", "--retry-all-errors", "--retry-delay", "2",
+                            "--continue-at", "-", "--output", str(target), source["url"]], check=True)
         else:
             download(source["url"], target)
         elapsed = time.perf_counter() - started
@@ -47,7 +52,7 @@ def main() -> None:
     total_started = time.perf_counter()
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
         rows = list(pool.map(fetch, config["sources"]))
-    backend = "aria2c" if aria2 else "urllib fallback used by dataset preparation"
+    backend = "aria2c" if aria2 else "curl with retry/resume" if curl else "urllib fallback"
     report = {"protocol": f"uncached download with {args.workers} concurrent sources; backend={backend}",
               "files": len(rows), "bytes": sum(row["bytes"] for row in rows),
               "elapsed_seconds": time.perf_counter() - total_started, "sources": rows}

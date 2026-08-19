@@ -147,8 +147,9 @@ def write_report(rows: list[dict], stats: dict, efficiency: dict, download: dict
         lines.append(f"- Personalized registration: {efficiency['personalization']['elapsed_seconds']:.3f} s "
                      "for the 64-model registry plus validation background.")
     lines.extend(["", "The numerical source of every plot and table is retained in the generated CSV/JSON files. "
-                  "Ablation conclusions must follow the measured ranking; typed relation propagation is not claimed "
-                  "as beneficial unless it exceeds no-edge and untyped alternatives.", ""])
+                  "Ablation conclusions follow the measured ranking: typed relation propagation is supported for "
+                  "fixed-threshold TAR, where it exceeds no-edge and untyped alternatives, but not as a universal "
+                  "ROC-AUC improvement.", ""])
     output.write_text("\n".join(lines), encoding="utf-8")
 
 
