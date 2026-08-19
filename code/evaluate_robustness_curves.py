@@ -41,17 +41,21 @@ DEFAULT_SWEEPS = {
     "cityjson_roundtrip": [1.0],
 }
 
+CORE_SWEEPS = {
+    "rotation_z": [180.0], "attribute_delete": [0.80], "coordinate_noise": [0.005],
+    "object_delete": [0.05, 0.40], "building_delete": [0.10, 0.40],
+    "surface_delete": [0.10, 0.40], "hierarchy_flatten": [0.40],
+    "semantic_relabel": [0.20], "cityjson_roundtrip": [1.0], "lod2_to_lod1": [1.0],
+}
+
 
 def bit_similarity(left: torch.Tensor, right: torch.Tensor) -> float:
     return float((left == right).float().mean().item())
 
 
 def encode(model, graph, relations, device, relation_mode, feature_mode):
-    x, edge_index, edge_type = graph_tensors(graph, relations, device)
-    if relation_mode == "no_edges":
-        edge_index, edge_type = edge_index[:, :0], edge_type[:0]
-    if feature_mode == "geometry":
-        x = x.clone(); x[:, 8:] = 0.0
+    x, edge_index, edge_type = graph_tensors(graph, relations, device, relation_mode, feature_mode,
+                                             int(getattr(model, "projection_key", 2026)))
     return model.fingerprint(model.encode(x, edge_index, edge_type))
 
 
@@ -64,6 +68,7 @@ def main() -> None:
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--attacks", nargs="+", choices=tuple(DEFAULT_SWEEPS),
                         help="Only evaluate selected attack families")
+    parser.add_argument("--profile", choices=("all", "core"), default="all")
     parser.add_argument("--work-root", help="Directory for temporary attacked CityGML files")
     parser.add_argument("--attack-cache", help="Persistent shared attacked-file cache reused across checkpoints")
     args = parser.parse_args()
@@ -106,7 +111,8 @@ def main() -> None:
             tempfile.TemporaryDirectory(prefix="cimfusemark_curves_", dir=work_root)
         with context as temporary:
             temporary_root = Path(temporary)
-            selected_sweeps = {name: DEFAULT_SWEEPS[name] for name in args.attacks} if args.attacks else DEFAULT_SWEEPS
+            base_sweeps = CORE_SWEEPS if args.profile == "core" else DEFAULT_SWEEPS
+            selected_sweeps = {name: base_sweeps[name] for name in args.attacks} if args.attacks else base_sweeps
             for attack, levels in selected_sweeps.items():
                 points = []
                 for level in levels:

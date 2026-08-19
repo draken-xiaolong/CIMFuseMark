@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from cimfusemark import attack_citygml_xml, build_citygml_graph, graph_fingerprint, similarity
+from cimfusemark.rgcn import FEATURE_GROUPS, graph_tensors, relation_vocabulary
 
 DATA = Path(__file__).parents[1] / "data" / "Building_CityGML3.0_LOD2_with_several_attributes.gml"
 
@@ -77,6 +78,23 @@ class CityGMLGraphTests(unittest.TestCase):
             self.assertFalse({node.node_type for node in attacked.nodes} & {
                 "WallSurface", "RoofSurface", "GroundSurface"})
             self.assertGreater(attacked.metadata["coordinate_count"], 0)
+
+    def test_feature_and_relation_ablation_tensorization(self):
+        relations = relation_vocabulary([self.graph])
+        full = graph_tensors(self.graph, relations, "cpu")
+        geometry = graph_tensors(self.graph, relations, "cpu", feature_mode="geometry")
+        self.assertTrue((geometry[0][:, 8:] == 0).all())
+        self.assertTrue((full[0][:, :8] == geometry[0][:, :8]).all())
+        self.assertEqual(set(FEATURE_GROUPS), {"geometry", "geometry_type", "geometry_attributes",
+                                              "geometry_depth", "geometry_boundary", "full"})
+        no_edges = graph_tensors(self.graph, relations, "cpu", relation_mode="no_edges")
+        hierarchy = graph_tensors(self.graph, relations, "cpu", relation_mode="hierarchy_only")
+        dropped = graph_tensors(self.graph, relations, "cpu", relation_mode="edge_drop_40")
+        rewired = graph_tensors(self.graph, relations, "cpu", relation_mode="random_rewire")
+        self.assertEqual(no_edges[1].shape[1], 0)
+        self.assertLessEqual(hierarchy[1].shape[1], full[1].shape[1])
+        self.assertLess(dropped[1].shape[1], full[1].shape[1])
+        self.assertEqual(rewired[1].shape, full[1].shape)
 
 
 if __name__ == "__main__":

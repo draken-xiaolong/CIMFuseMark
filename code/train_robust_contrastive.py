@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import resource
 import tempfile
+import time
 from pathlib import Path
 
 import torch
@@ -20,19 +22,15 @@ ROOT = Path(__file__).resolve().parent
 DATA_ROOT = ROOT / "data"
 
 
-def _tensorize(graph, relations, device, relation_mode="typed", feature_mode="full"):
-    x, edge_index, edge_type = graph_tensors(graph, relations, device)
-    if relation_mode == "no_edges":
-        edge_index, edge_type = edge_index[:, :0], edge_type[:0]
-    elif relation_mode == "untyped":
-        edge_type = torch.zeros_like(edge_type)
-    if feature_mode == "geometry":
-        x = x.clone(); x[:, 8:] = 0.0
-    return x, edge_index, edge_type
+def _tensorize(graph, relations, device, relation_mode="typed", feature_mode="full", seed=2026):
+    return graph_tensors(graph, relations, device, relation_mode, feature_mode, seed)
 
 
 def _curriculum_levels(config: dict, attack: str, progress: float) -> list[float]:
     levels = list(config[f"{attack}_levels"])
+    if not config.get("curriculum", True):
+        fixed = config.get("fixed_attack_levels", {}).get(attack)
+        return [float(fixed)] if fixed is not None else [float(levels[-1])]
     boundaries = list(config["curriculum_boundaries"])
     stage = sum(progress >= boundary for boundary in boundaries) + 1
     keep = max(1, round(len(levels) * stage / (len(boundaries) + 1)))
@@ -47,8 +45,8 @@ def main() -> None:
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--output-prefix", default="rgcn_plateau_robust")
-    parser.add_argument("--relation-mode", choices=("typed", "untyped", "no_edges"), default="typed")
-    parser.add_argument("--feature-mode", choices=("full", "geometry"), default="full")
+    parser.add_argument("--relation-mode", default="typed")
+    parser.add_argument("--feature-mode", default="full")
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
     if args.epochs is not None:
@@ -66,6 +64,10 @@ def main() -> None:
         "quantization": config["quantization_levels"],
         "rotation": config["rotation_levels"],
     }
+    if int(config["views_per_model"]) == 0:
+        attacks = {}
+    started = time.perf_counter()
+    if device.type == "cuda": torch.cuda.reset_peak_memory_stats(device)
 
     records = []
     with tempfile.TemporaryDirectory(prefix="cimfusemark_robust_") as temporary:
@@ -91,13 +93,14 @@ def main() -> None:
         relations = relation_vocabulary(all_graphs)
         for record in records:
             record["clean_tensor"] = _tensorize(record["clean"], relations, device,
-                                                  args.relation_mode, args.feature_mode)
+                                                  args.relation_mode, args.feature_mode, seed)
             record["bank_tensor"] = {family: {level: _tensorize(graph, relations, device,
-                                                                  args.relation_mode, args.feature_mode)
+                                                                  args.relation_mode, args.feature_mode, seed)
                                                for level, graph in levels.items()}
                                      for family, levels in record["bank"].items()}
 
         input_dim = records[0]["clean_tensor"][0].shape[1]
+        preprocessing_seconds = time.perf_counter() - started
         model = CIMFuseRGCN(input_dim, int(config["hidden_dim"]), int(config["embedding_dim"]),
                             len(relations), int(config["fingerprint_bits"]), seed).to(device)
         optimizer = torch.optim.AdamW(model.parameters(), lr=float(config["learning_rate"]),
@@ -106,10 +109,12 @@ def main() -> None:
         history = []
         epochs = int(config["epochs"])
         views_per_model = int(config["views_per_model"])
+        training_started = time.perf_counter()
         for epoch in range(epochs):
             model.train(); optimizer.zero_grad()
             progress = epoch / max(epochs - 1, 1)
-            forced = [families[(epoch + offset) % len(families)] for offset in range(views_per_model)]
+            forced = ([families[(epoch + offset) % len(families)] for offset in range(views_per_model)]
+                      if families else [])
             model_views = []
             for record_index, record in enumerate(records):
                 tensors = [record["clean_tensor"]]
@@ -129,7 +134,8 @@ def main() -> None:
             embedding_tail = embedding_tail_loss(embeddings, float(config["tail_fraction"]))
             bit_separation = bit_separation_loss(
                 soft_bits[:, 0], float(config["bit_separation_margin"]))
-            binary = stability + float(config["balance_weight"]) * balance + \
+            binary = float(config.get("stability_weight", 1.0)) * stability + \
+                     float(config["balance_weight"]) * balance + \
                      float(config["quantization_weight"]) * quantization
             loss = (float(config["contrastive_weight"]) * contrastive +
                     float(config["binary_weight"]) * binary +
@@ -146,8 +152,14 @@ def main() -> None:
             if (epoch + 1) % 10 == 0 or epoch + 1 == epochs:
                 history.append(row)
 
+        elapsed = time.perf_counter() - started
         output = {"config": config, "device": str(device), "models": len(records),
                   "relations": relations, "model_digest": model_digest(model), "history": history,
+                  "elapsed_seconds": elapsed,
+                  "preprocessing_seconds": preprocessing_seconds,
+                  "training_seconds": time.perf_counter() - training_started,
+                  "peak_gpu_memory_bytes": (torch.cuda.max_memory_allocated(device) if device.type == "cuda" else 0),
+                  "peak_process_rss_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024),
                   "relation_mode": args.relation_mode, "feature_mode": args.feature_mode,
                   "training_protocol": "clean plus three forced attack-family views; curriculum up to 60% object deletion"}
         result_root = ROOT / "results"; result_root.mkdir(parents=True, exist_ok=True)

@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import resource
+import time
 from pathlib import Path
 
 import torch
@@ -29,6 +31,7 @@ def main() -> None:
     parser.add_argument("--output", default=str(ROOT / "results" / "rgcn_personalized.pt"))
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
+    started = time.perf_counter()
 
     device = torch.device(args.device)
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
@@ -108,6 +111,9 @@ def main() -> None:
         "background_split": args.background_split, "background_models": len(background),
         "registered_ids_digest": hashlib.sha256("\n".join(item["id"] for item in selected).encode()).hexdigest()[:16],
         "config": config, "last_loss": last,
+        "elapsed_seconds": time.perf_counter() - started,
+        "peak_gpu_memory_bytes": (torch.cuda.max_memory_allocated(device) if device.type == "cuda" else 0),
+        "peak_process_rss_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024),
         "registered_negative_mean": float(off_diagonal.mean()),
         "registered_negative_maximum": float(off_diagonal.max()),
         "warning": "Transductive registration result; encoder remains region-disjoint, hash projection sees clean enrolled models only.",

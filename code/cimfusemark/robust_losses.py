@@ -32,16 +32,21 @@ def robust_bit_loss(soft_bits: torch.Tensor, tail_fraction: float = 0.34) -> tup
     ``soft_bits`` has shape ``[models, views, bits]`` and view zero is clean.
     """
     clean = soft_bits[:, :1]
-    view_mse = (soft_bits[:, 1:] - clean).square().mean(dim=2)
-    stability = view_mse.mean()
     balance = soft_bits.mean(dim=(0, 1)).square().mean()
     quantization = (1.0 - soft_bits.abs()).square().mean()
+    if soft_bits.shape[1] == 1:
+        zero = soft_bits.sum() * 0.0
+        return zero, balance, quantization, zero
+    view_mse = (soft_bits[:, 1:] - clean).square().mean(dim=2)
+    stability = view_mse.mean()
     tail_count = max(1, math.ceil(view_mse.shape[1] * tail_fraction))
     bit_tail = view_mse.topk(tail_count, dim=1).values.mean()
     return stability, balance, quantization, bit_tail
 
 
 def embedding_tail_loss(embeddings: torch.Tensor, tail_fraction: float = 0.34) -> torch.Tensor:
+    if embeddings.shape[1] == 1:
+        return embeddings.sum() * 0.0
     clean = embeddings[:, :1]
     distances = 1.0 - F.cosine_similarity(embeddings[:, 1:], clean.expand_as(embeddings[:, 1:]), dim=2)
     tail_count = max(1, math.ceil(distances.shape[1] * tail_fraction))

@@ -1,0 +1,31 @@
+{
+  "experiments": [
+    {"id": "full_seed2026", "group": "reference", "reuse": "rgcn_multicity_separated", "relation_mode": "typed", "feature_mode": "full"},
+    {"id": "loss_no_contrastive", "group": "loss", "overrides": {"contrastive_weight": 0.0}},
+    {"id": "loss_no_bit_stability", "group": "loss", "overrides": {"stability_weight": 0.0}},
+    {"id": "loss_no_tail", "group": "loss", "overrides": {"embedding_tail_weight": 0.0, "bit_tail_weight": 0.0}},
+    {"id": "loss_no_separation", "group": "loss", "reuse": "rgcn_multicity_base", "relation_mode": "typed", "feature_mode": "full"},
+    {"id": "loss_no_curriculum", "group": "loss", "overrides": {"curriculum": false, "fixed_attack_levels": {"object_delete": 0.4, "attribute_delete": 0.4, "quantization": 0.01, "rotation": 90.0}}},
+    {"id": "loss_clean_only", "group": "loss", "overrides": {"views_per_model": 0, "contrastive_weight": 0.0}},
+
+    {"id": "feature_geometry", "group": "feature", "feature_mode": "geometry"},
+    {"id": "feature_geometry_type", "group": "feature", "feature_mode": "geometry_type"},
+    {"id": "feature_geometry_attributes", "group": "feature", "feature_mode": "geometry_attributes"},
+    {"id": "feature_geometry_depth", "group": "feature", "feature_mode": "geometry_depth"},
+    {"id": "feature_geometry_boundary", "group": "feature", "feature_mode": "geometry_boundary"},
+
+    {"id": "graph_untyped", "group": "graph", "relation_mode": "untyped"},
+    {"id": "graph_no_edges", "group": "graph", "reuse": "deepsets_multicity", "relation_mode": "no_edges", "feature_mode": "full"},
+    {"id": "graph_hierarchy_only", "group": "graph", "relation_mode": "hierarchy_only"},
+    {"id": "graph_no_spatial", "group": "graph", "relation_mode": "no_spatial"},
+    {"id": "graph_no_reverse", "group": "graph", "relation_mode": "no_reverse"},
+    {"id": "graph_edge_drop_20", "group": "graph", "relation_mode": "edge_drop_20"},
+    {"id": "graph_edge_drop_40", "group": "graph", "relation_mode": "edge_drop_40"},
+    {"id": "graph_edge_drop_60", "group": "graph", "relation_mode": "edge_drop_60"},
+    {"id": "graph_random_rewire", "group": "graph", "relation_mode": "random_rewire"},
+    {"id": "graph_hierarchy_flattened", "group": "graph", "relation_mode": "hierarchy_flattened"},
+
+    {"id": "full_seed2027", "group": "multiseed", "seed": 2027},
+    {"id": "full_seed2028", "group": "multiseed", "seed": 2028}
+  ]
+}
