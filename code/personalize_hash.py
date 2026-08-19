@@ -15,7 +15,7 @@ import torch.nn.functional as F
 
 from cimfusemark import build_citygml_graph
 from cimfusemark.personalization import codebook_similarity, keyed_codebook
-from cimfusemark.rgcn import CIMFuseRGCN, graph_tensors, model_digest
+from cimfusemark.rgcn import create_model, graph_tensors, model_digest
 
 ROOT = Path(__file__).resolve().parent
 DATA_ROOT = ROOT / "data"
@@ -45,20 +45,26 @@ def main() -> None:
         raise ValueError("Personalization needs at least two registered CIM models")
     graphs = {item["id"]: build_citygml_graph((DATA_ROOT / item["path"]).resolve()) for item in selected}
     relations = checkpoint["relations"]
-    input_dim = len(next(iter(graphs.values())).nodes[0].features)
-    model = CIMFuseRGCN(input_dim, int(base_config["hidden_dim"]), int(base_config["embedding_dim"]),
-                        max(relations.values(), default=0) + 1, int(base_config["fingerprint_bits"]),
-                        int(base_config["seed"])).to(device)
+    relation_mode = checkpoint.get("relation_mode", "typed"); feature_mode = checkpoint.get("feature_mode", "full")
+    input_dim = graph_tensors(next(iter(graphs.values())), relations, device, relation_mode,
+                              feature_mode, int(base_config["seed"]))[0].shape[1]
+    base_config = {**base_config,
+                   "encoder_type": checkpoint.get("encoder_type", base_config.get("encoder_type", "rgcn"))}
+    model = create_model(input_dim, base_config, max(relations.values(), default=0) + 1,
+                         int(base_config["seed"])).to(device)
     model.load_state_dict(checkpoint["state_dict"]); model.eval()
     for parameter in model.parameters(): parameter.requires_grad_(False)
     with torch.no_grad():
-        embeddings = torch.stack([model.encode(*graph_tensors(graphs[item["id"]], relations, device))
+        embeddings = torch.stack([model.encode(*graph_tensors(graphs[item["id"]], relations, device,
+                                                               relation_mode, feature_mode,
+                                                               int(base_config["seed"])))
                                   for item in selected])
         background_embeddings = None
         if background:
             background_embeddings = torch.stack([
                 model.encode(*graph_tensors(build_citygml_graph((DATA_ROOT / item["path"]).resolve()),
-                                                  relations, device)) for item in background])
+                                            relations, device, relation_mode, feature_mode,
+                                            int(base_config["seed"]))) for item in background])
 
     registration_seed = int(base_config["seed"]) + int(config["seed_offset"])
     targets = keyed_codebook(len(selected), int(base_config["fingerprint_bits"]),

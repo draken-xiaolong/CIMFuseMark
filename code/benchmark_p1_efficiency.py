@@ -14,7 +14,7 @@ from pathlib import Path
 import torch
 
 from cimfusemark import build_citygml_graph
-from cimfusemark.rgcn import CIMFuseRGCN, graph_tensors
+from cimfusemark.rgcn import create_model, graph_tensors
 
 ROOT = Path(__file__).resolve().parent
 DATA_ROOT = ROOT / "data"
@@ -32,8 +32,10 @@ def synchronize(device):
 def load_model(path: Path, first_graph, device):
     checkpoint = torch.load(path, map_location=device, weights_only=False); config = checkpoint["config"]
     relations = checkpoint["relations"]
-    model = CIMFuseRGCN(len(first_graph.nodes[0].features), int(config["hidden_dim"]), int(config["embedding_dim"]),
-                        max(relations.values(), default=0)+1, int(config["fingerprint_bits"]), int(config["seed"])).to(device)
+    input_dim = graph_tensors(first_graph, relations, device, checkpoint.get("relation_mode", "typed"),
+                              checkpoint.get("feature_mode", "full"), int(config["seed"]))[0].shape[1]
+    config = {**config, "encoder_type": checkpoint.get("encoder_type", config.get("encoder_type", "rgcn"))}
+    model = create_model(input_dim, config, max(relations.values(), default=0)+1, int(config["seed"])).to(device)
     model.load_state_dict(checkpoint["state_dict"]); model.eval()
     return checkpoint, model, relations
 
