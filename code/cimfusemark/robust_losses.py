@@ -44,6 +44,25 @@ def robust_bit_loss(soft_bits: torch.Tensor, tail_fraction: float = 0.34) -> tup
     return stability, balance, quantization, bit_tail
 
 
+def soft_nc_loss(soft_bits: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """Mean and worst-view loss corresponding directly to normalized bit agreement.
+
+    For saturated soft bits in ``{-1, +1}``, ``(1 - clean * attacked) / 2`` is
+    exactly the bit error indicator, hence one minus this loss is mean NC.
+    """
+    if soft_bits.shape[1] == 1:
+        zero = soft_bits.sum() * 0.0
+        return zero, zero
+    clean = soft_bits[:, :1]
+    view_losses = (1.0 - clean * soft_bits[:, 1:]).mean(dim=2) * 0.5
+    return view_losses.mean(), view_losses.max(dim=1).values.mean()
+
+
+def bit_margin_loss(bit_logits: torch.Tensor, margin: float = 0.5) -> torch.Tensor:
+    """Keep clean and attacked projection logits away from the binarization boundary."""
+    return F.relu(float(margin) - bit_logits.abs()).square().mean()
+
+
 def embedding_tail_loss(embeddings: torch.Tensor, tail_fraction: float = 0.34) -> torch.Tensor:
     if embeddings.shape[1] == 1:
         return embeddings.sum() * 0.0

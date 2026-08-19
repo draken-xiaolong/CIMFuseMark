@@ -17,8 +17,9 @@ import torch
 
 from cimfusemark import attack_citygml_xml, build_citygml_graph
 from cimfusemark.rgcn import create_model, graph_tensors, model_digest, relation_vocabulary
-from cimfusemark.robust_losses import (bit_separation_loss, embedding_tail_loss,
-                                       multi_positive_nt_xent, robust_bit_loss)
+from cimfusemark.robust_losses import (bit_margin_loss, bit_separation_loss,
+                                       embedding_tail_loss, multi_positive_nt_xent,
+                                       robust_bit_loss, soft_nc_loss)
 
 ROOT = Path(__file__).resolve().parent
 DATA_ROOT = ROOT / "data"
@@ -65,12 +66,11 @@ def main() -> None:
     device = torch.device(args.device)
     manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
     train_items = [item for item in manifest["models"] if item.get("split") == "train"]
-    attacks = {
-        "object_delete": config["object_delete_levels"],
-        "attribute_delete": config["attribute_delete_levels"],
-        "quantization": config["quantization_levels"],
-        "rotation": config["rotation_levels"],
-    }
+    configured_families = config.get(
+        "training_attack_families",
+        ["object_delete", "attribute_delete", "quantization", "rotation"],
+    )
+    attacks = {family: config[f"{family}_levels"] for family in configured_families}
     if int(config["views_per_model"]) == 0:
         attacks = {}
     started = time.perf_counter()
@@ -138,21 +138,22 @@ def main() -> None:
             for record_index, record in enumerate(records):
                 tensors = [record["clean_tensor"]]
                 for view_index, family in enumerate(forced):
-                    level_key = "rotation" if family == "rotation" else family
-                    allowed = _curriculum_levels(config, level_key, progress)
+                    allowed = _curriculum_levels(config, family, progress)
                     available = [float(level) for level in allowed if float(level) in record["bank_tensor"][family]]
                     level = available[(epoch + record_index + view_index) % len(available)]
                     tensors.append(record["bank_tensor"][family][level])
                 model_views.append(torch.stack([model.encode(*tensor) for tensor in tensors]))
             embeddings = torch.stack(model_views)
-            soft_bits = torch.tanh(torch.einsum("bvd,kd->bvk", embeddings, model.projection) /
-                                   float(config["bit_temperature"]))
+            bit_logits = torch.einsum("bvd,kd->bvk", embeddings, model.projection)
+            soft_bits = torch.tanh(bit_logits / float(config["bit_temperature"]))
             contrastive = multi_positive_nt_xent(embeddings, float(config["contrastive_temperature"]))
             stability, balance, quantization, bit_tail = robust_bit_loss(
                 soft_bits, float(config["tail_fraction"]))
             embedding_tail = embedding_tail_loss(embeddings, float(config["tail_fraction"]))
             bit_separation = bit_separation_loss(
                 soft_bits[:, 0], float(config["bit_separation_margin"]))
+            nc_mean, nc_worst = soft_nc_loss(soft_bits)
+            bit_margin = bit_margin_loss(bit_logits, float(config.get("bit_margin", 0.0)))
             binary = float(config.get("stability_weight", 1.0)) * stability + \
                      float(config["balance_weight"]) * balance + \
                      float(config["quantization_weight"]) * quantization
@@ -160,11 +161,16 @@ def main() -> None:
                     float(config["binary_weight"]) * binary +
                     float(config["embedding_tail_weight"]) * embedding_tail +
                     float(config["bit_tail_weight"]) * bit_tail +
-                    float(config["bit_separation_weight"]) * bit_separation)
+                    float(config["bit_separation_weight"]) * bit_separation +
+                    float(config.get("nc_weight", 0.0)) * nc_mean +
+                    float(config.get("worst_nc_weight", 0.0)) * nc_worst +
+                    float(config.get("bit_margin_weight", 0.0)) * bit_margin)
             loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); optimizer.step()
             row = {"epoch": epoch + 1, "loss": float(loss.detach()), "contrastive": float(contrastive.detach()),
                    "bit_stability": float(stability.detach()), "embedding_tail": float(embedding_tail.detach()),
                    "bit_tail": float(bit_tail.detach()), "bit_separation": float(bit_separation.detach()),
+                   "nc_loss": float(nc_mean.detach()), "worst_nc_loss": float(nc_worst.detach()),
+                   "bit_margin": float(bit_margin.detach()),
                    "families": forced}
             if epoch == 0 or epoch + 1 == epochs or (epoch + 1) % 50 == 0:
                 print(json.dumps(row))
@@ -183,7 +189,8 @@ def main() -> None:
                   "trainable_parameters": sum(parameter.numel() for parameter in model.parameters()
                                               if parameter.requires_grad),
                   "relation_mode": args.relation_mode, "feature_mode": args.feature_mode,
-                  "training_protocol": "clean plus three forced attack-family views; curriculum up to 60% object deletion"}
+                  "training_protocol": ("clean plus forced attack-family views; curriculum maximums=" +
+                                        json.dumps({name: max(levels) for name, levels in attacks.items()}, sort_keys=True))}
         result_root = ROOT / "results"; result_root.mkdir(parents=True, exist_ok=True)
         (result_root / f"{args.output_prefix}_training.json").write_text(json.dumps(output, indent=2), encoding="utf-8")
         torch.save({"state_dict": model.state_dict(), "relations": relations, "config": config,
