@@ -110,6 +110,10 @@ The expanded Japan-only experiment uses 31 LoD2 CityGML tiles and 241 buildings.
 
 Rotation through 180 degrees and 80% attribute deletion retain AUC 1.0 / EER 0. Ten-percent building deletion obtains AUC 0.997 / EER 1.82%, while 40% building deletion falls to AUC 0.945 / EER 18.18%. Mixed object deletion, semantic-surface deletion, and sequential attacks deteriorate strongly at high intensity, so 60%--80% structural deletion is a stress test rather than a supported operating range. See `docs/v0.9_japan_plateau_expanded_zh.md` for the complete protocol and fixed-threshold results.
 
+## P0 Japan multicity benchmark
+
+The publication benchmark expands to 143 tiles and 1,137 LoD2 buildings. Tokyo wards and Saitama form the training split, Yokohama and Kawasaki form validation, and Osaka, Fukuoka, Hiroshima, and Sendai form a geographically disjoint 64-tile test split. The audited graphs contain 33,688 nodes and 166,166 edges with zero parse failures. See `docs/p0_multicity_protocol_zh.md` and `docs/data_storage_zh.md`.
+
 ## What this demo proves (and does not prove)
 
 This is a feasibility check, not the final paper algorithm. It tests whether CityGML models can yield stable content fingerprints under translation, rotation, uniform scaling, coordinate noise, coordinate quantization, contiguous spatial cropping, attribute deletion, object reordering, and real XML object-subtree deletion. It does not yet compute exact surface-touch topology, execute real CityGML/CityJSON conversion, train on a representative city-scale corpus, or validate a deployment false-positive threshold.
