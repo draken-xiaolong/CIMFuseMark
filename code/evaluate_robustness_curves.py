@@ -160,6 +160,10 @@ def main() -> None:
             "negative_mean": statistics.fmean(negative_scores) if negative_scores else None,
             "negative_q95": rejection_threshold,
             "negative_maximum": max(negative_scores) if negative_scores else None,
+            "distinct_fingerprints": len({tuple(int(value) for value in bits.tolist())
+                                           for bits in clean_bits.values()}),
+            "collision_pairs": sum(score == 1.0 for score in negative_scores),
+            "negative_scores": negative_scores,
         },
         "curves": curves,
         "warning": "Attack-specific similarity curves; thresholds are not recalibrated at each intensity.",

@@ -86,6 +86,8 @@ def main() -> None:
                                name: sum(score >= value for score in impostor_scores) / len(impostor_scores)
                                for name, value in pair_thresholds.items()},
                            "impostor_maxima": impostor_maxima}}
+    if "registration" in checkpoint:
+        output["registration"] = checkpoint["registration"]
     if args.curves:
         curves = json.loads(Path(args.curves).read_text(encoding="utf-8"))["curves"]
         output["fixed_threshold_attacks"] = {
