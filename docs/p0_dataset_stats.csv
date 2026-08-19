@@ -1,0 +1,11 @@
+region,split,year,specification,tiles,buildings,boundary_nodes
+Fukuoka,test,2024,4.1,16,128,3754
+Hiroshima,test,2024,4.1,16,128,1902
+Osaka,test,2025,5.0,16,128,389
+Sendai,test,2024,4.1,16,128,1868
+Saitama,train,2025,5.0,16,128,1518
+Tokyo Chiyoda,train,2025,5.0,12,94,2908
+Tokyo Minato,train,2025,5.0,8,60,1475
+Tokyo Shinjuku,train,2025,5.0,11,87,6976
+Kawasaki,validation,2022,4.1,16,128,1549
+Yokohama,validation,2024,4.1,16,128,9454
