@@ -8,5 +8,8 @@
 
 ## Selection
 
-Partial-encoder fine-tuning is the best personalized Lite variant for seed 2026. It preserves the projection-only q95, improves AUC/EER, and recovers most of the Base open-set TAR.
-The result remains exploratory until repeated with additional seeds. The Base model remains the non-transductive reference.
+The final paper uses **projection-only personalization**. The shared Lite encoder remains frozen, so registration is lightweight, auditable, and does not turn the test registry into encoder training data. Partial-encoder fine-tuning is retained only as a rejected exploratory variant.
+
+Three-seed confirmation (2026--2028) gives Base AUC/EER/TAR of `0.9032±0.0090`, `0.1285±0.0046`, and `0.6975±0.0115`; projection-only personalization gives `0.9317±0.0045`, `0.0950±0.0032`, and `0.6831±0.0172`. Negative q95 falls reproducibly from `0.7170±0.0132` to `0.5565±0.0031`.
+
+Therefore Base remains the inductive default. Projection-only personalization is an optional transductive enrollment step whose stable contribution is registry uniqueness, not a claim of uniformly higher fixed-threshold robustness.
