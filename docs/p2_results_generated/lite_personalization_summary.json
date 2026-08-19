@@ -1,0 +1,43 @@
+{
+  "experiments": [
+    {
+      "variant": "base",
+      "label": "Lite Base",
+      "negative_mean": 0.556700691344246,
+      "negative_q95": 0.732177734375,
+      "negative_max": 0.87890625,
+      "auc_mean": 0.8929006648733211,
+      "eer_mean": 0.1338045634920635,
+      "tar_far5_mean": 0.7079326923076923,
+      "tar_far1_mean": 0.6935096153846154,
+      "far5_threshold": 0.7929687500000001,
+      "observed_far5": 0.03125
+    },
+    {
+      "variant": "projection",
+      "label": "Lite + projection",
+      "negative_mean": 0.4943644205729167,
+      "negative_q95": 0.55859375,
+      "negative_max": 0.68359375,
+      "auc_mean": 0.9269581330128205,
+      "eer_mean": 0.09686927655677656,
+      "tar_far5_mean": 0.6682692307692307,
+      "tar_far1_mean": 0.6670673076923077,
+      "far5_threshold": 0.7402343750000001,
+      "observed_far5": 0.03125
+    },
+    {
+      "variant": "finetune",
+      "label": "Lite + partial encoder fine-tuning",
+      "negative_mean": 0.49452621217757936,
+      "negative_q95": 0.558837890625,
+      "negative_max": 0.7236328125,
+      "auc_mean": 0.9313768100389195,
+      "eer_mean": 0.08377213064713064,
+      "tar_far5_mean": 0.6947115384615384,
+      "tar_far1_mean": 0.6899038461538461,
+      "far5_threshold": 0.7324218750000001,
+      "observed_far5": 0.03125
+    }
+  ]
+}
