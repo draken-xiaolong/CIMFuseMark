@@ -2,10 +2,12 @@
 
 Final protocol: R-GCN hidden 64 / embedding 192, G8+D node features, 1024-bit fingerprint, 117,057 trainable parameters. The optional personalized version freezes the entire graph encoder and optimizes only the keyed projection.
 
-| Variant (3 seeds) | AUC | EER | TAR@FAR≤5% | Negative mean | Negative q95 | Negative max |
-|---|---:|---:|---:|---:|---:|---:|
-| Lite Base | 0.9032±0.0090 | 0.1285±0.0046 | 0.6975±0.0115 | 0.5463±0.0148 | 0.7170±0.0132 | 0.8597±0.0175 |
-| Lite + projection | 0.9317±0.0045 | 0.0950±0.0032 | 0.6831±0.0172 | 0.4942±0.0001 | 0.5565±0.0031 | 0.6715±0.0316 |
+The paper follows the mainstream zero-watermark protocol and reports mean NC for robustness and cross-CIM NC for uniqueness.
+
+| Variant (3 seeds) | Same-source mean NC | Different-source mean NC | Different-source q95 | Different-source max |
+|---|---:|---:|---:|---:|
+| Lite Base | 0.8339±0.0011 | 0.5463±0.0148 | 0.7170±0.0132 | 0.8597±0.0175 |
+| Lite + projection | 0.8041±0.0029 | 0.4942±0.0001 | 0.5565±0.0031 | 0.6715±0.0316 |
 
 Dedicated RTX 4090 inference benchmark (64 test CIMs):
 

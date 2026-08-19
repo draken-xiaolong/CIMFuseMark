@@ -50,7 +50,7 @@ def save_all(fig, stem: Path) -> None:
 
 def attack_map(report: dict) -> dict:
     return {name: {float(row["intensity"]): row for row in rows}
-            for name, rows in report["fixed_threshold_attacks"].items()}
+            for name, rows in report["curves"].items()}
 
 
 def robustness(base: dict, personalized: dict, stem: Path) -> list[dict]:
@@ -59,13 +59,12 @@ def robustness(base: dict, personalized: dict, stem: Path) -> list[dict]:
     rows = []
     for panel, (ax, (attack, title)) in enumerate(zip(axes, ATTACKS)):
         levels = sorted(set(base_map.get(attack, {})) & set(personal_map.get(attack, {})))
-        x = np.arange(len(levels)); base_y = [base_map[attack][level]["tar_at_far_5pct"] for level in levels]
-        personal_y = [personal_map[attack][level]["tar_at_far_5pct"] for level in levels]
+        x = np.arange(len(levels)); base_y = [base_map[attack][level]["similarity_mean"] for level in levels]
+        personal_y = [personal_map[attack][level]["similarity_mean"] for level in levels]
         ax.plot(x, base_y, color="#3569A8", linestyle="--", marker="o", markersize=3,
                 markerfacecolor="white", linewidth=1.25, label="Lite Base")
         ax.plot(x, personal_y, color="#C83E4D", linestyle="-", marker="s", markersize=3,
                 linewidth=1.35, label="Lite + personalized projection")
-        ax.axhline(0.5, color="#D8D2C7", linewidth=0.7, linestyle=(0, (2, 2)), zorder=0)
         labels = [f"{level:g}" for level in levels]
         ax.set_xticks(x); ax.set_xticklabels(labels, rotation=35 if len(labels) > 5 else 0,
                                              ha="right" if len(labels) > 5 else "center")
@@ -73,16 +72,16 @@ def robustness(base: dict, personalized: dict, stem: Path) -> list[dict]:
         ax.set_title(title, pad=3, fontweight="semibold")
         ax.text(-0.15, 1.04, chr(97+panel), transform=ax.transAxes, fontsize=7.5,
                 fontweight="bold", va="bottom")
-        if panel % 3 == 0: ax.set_ylabel("TAR at validation FAR ≤ 5%")
-        rows.extend({"attack": attack, "intensity": level, "base_tar": by,
-                     "personalized_tar": py, "delta": py-by}
+        if panel % 3 == 0: ax.set_ylabel("Mean NC")
+        rows.extend({"attack": attack, "intensity": level, "base_mean_nc": by,
+                     "personalized_mean_nc": py, "delta_nc": py-by}
                     for level, by, py in zip(levels, base_y, personal_y))
     handles, labels = axes[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(.5, .965), ncol=2,
                handlelength=2.7, columnspacing=1.7)
     fig.suptitle("CIMFuseMark-Lite robustness under CityGML attacks", y=.995,
                  fontsize=9.2, fontweight="bold")
-    fig.text(.5, .016, "Thresholds are frozen from region-disjoint validation CIMs; higher TAR is better.",
+    fig.text(.5, .016, "NC is the normalized bit agreement between the original and attacked zero-watermark fingerprints.",
              ha="center", fontsize=5.6, color="#555555")
     fig.subplots_adjust(left=.08, right=.985, bottom=.07, top=.92, wspace=.18, hspace=.54)
     save_all(fig, stem)
@@ -153,11 +152,10 @@ def uniqueness(base_curves: dict, personal_curves: dict, manifest: dict, stem: P
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-open", required=True); parser.add_argument("--personal-open", required=True)
     parser.add_argument("--base-curves", required=True); parser.add_argument("--personal-curves", required=True)
     parser.add_argument("--manifest", required=True); parser.add_argument("--output", required=True)
     args = parser.parse_args(); output = Path(args.output); output.mkdir(parents=True, exist_ok=True)
-    robust_rows = robustness(load(Path(args.base_open)), load(Path(args.personal_open)), output/"cimfusemark_lite_robustness_grid")
+    robust_rows = robustness(load(Path(args.base_curves)), load(Path(args.personal_curves)), output/"cimfusemark_lite_robustness_grid")
     unique_rows = uniqueness(load(Path(args.base_curves)), load(Path(args.personal_curves)), load(Path(args.manifest)), output/"cimfusemark_lite_uniqueness_matrix")
     for name, rows in (("cimfusemark_lite_robustness.csv", robust_rows), ("cimfusemark_lite_uniqueness.csv", unique_rows)):
         with (output/name).open("w", newline="", encoding="utf-8") as handle:
