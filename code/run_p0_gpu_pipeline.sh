@@ -33,6 +33,12 @@ if [[ ! -f "${RESULTS}/rgcn_multicity_base.pt" ]]; then
     --output-prefix rgcn_multicity_base
 fi
 
+if [[ ! -f "${RESULTS}/deepsets_multicity.pt" ]]; then
+  "${PYTHON}" "${ROOT}/train_robust_contrastive.py" \
+    --manifest "${MANIFEST}" --device "${DEVICE}" --relation-mode no_edges \
+    --output-prefix deepsets_multicity
+fi
+
 if [[ ! -f "${RESULTS}/rgcn_multicity_personalized.pt" ]]; then
   "${PYTHON}" "${ROOT}/personalize_hash.py" \
     --checkpoint "${RESULTS}/rgcn_multicity_separated.pt" \
@@ -54,5 +60,17 @@ for variant in separated base personalized; do
     --registered-split test --calibration-split validation --curves "${curves}" \
     --device "${DEVICE}" --output "${open_set}"
 done
+
+if [[ ! -f "${RESULTS}/multicity_deepsets_curves.json" ]]; then
+  "${PYTHON}" "${ROOT}/evaluate_robustness_curves.py" \
+    --manifest "${MANIFEST}" --checkpoint "${RESULTS}/deepsets_multicity.pt" --split test \
+    --device "${DEVICE}" --work-root "${WORK_ROOT}" \
+    --output "${RESULTS}/multicity_deepsets_curves.json"
+fi
+"${PYTHON}" "${ROOT}/evaluate_open_set.py" \
+  --manifest "${MANIFEST}" --checkpoint "${RESULTS}/deepsets_multicity.pt" \
+  --registered-split test --calibration-split validation \
+  --curves "${RESULTS}/multicity_deepsets_curves.json" --device "${DEVICE}" \
+  --output "${RESULTS}/multicity_deepsets_open_set.json"
 
 echo "P0 GPU pipeline complete: ${RESULTS}"

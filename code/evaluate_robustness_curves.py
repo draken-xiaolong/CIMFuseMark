@@ -35,6 +35,8 @@ DEFAULT_SWEEPS = {
     "spatial_crop": [0.10, 0.20, 0.40, 0.60, 0.80],
     "building_add": [0.10, 0.20, 0.40, 0.60, 0.80],
     "id_rename": [1.0],
+    "object_reorder": [1.0],
+    "coordinate_unit": [0.001, 1000.0],
     "cityjson_roundtrip": [1.0],
 }
 
@@ -102,7 +104,7 @@ def main() -> None:
             for attack, levels in selected_sweeps.items():
                 points = []
                 for level in levels:
-                    scores, changed, node_ratios, valid = [], [], [], 0
+                    scores, changed, node_ratios, semantic_ratios, coordinate_ratios, valid = [], [], [], [], [], 0
                     for item in selected:
                         source = (DATA_ROOT / item["path"]).resolve()
                         attacked_path = temporary_root / f"{item['id']}__{attack}_{level}.gml"
@@ -113,11 +115,19 @@ def main() -> None:
                             bits = encode(model, attacked, relations, device, relation_mode, feature_mode)
                             scores.append(bit_similarity(clean_bits[item["id"]], bits))
                             node_ratios.append(len(attacked.nodes) / max(len(clean_graphs[item["id"]].nodes), 1))
+                            clean_semantic = len(clean_graphs[item["id"]].nodes)
+                            attacked_semantic = len(attacked.nodes)
+                            clean_coordinates = sum(node.point_count for node in clean_graphs[item["id"]].nodes)
+                            attacked_coordinates = sum(node.point_count for node in attacked.nodes)
+                            semantic_ratios.append(attacked_semantic / max(clean_semantic, 1))
+                            coordinate_ratios.append(attacked_coordinates / max(clean_coordinates, 1))
                             valid += 1
                         except ValueError:
                             # A destructively emptied model is an authentication failure, not a missing sample.
                             scores.append(0.0)
                             node_ratios.append(0.0)
+                            semantic_ratios.append(0.0)
+                            coordinate_ratios.append(0.0)
                         changed.append(int(mutation["changed_elements"]))
                     authentication = ({"auc": auc_from_scores(scores, negative_scores),
                                        **eer_from_scores(scores, negative_scores),
@@ -132,6 +142,8 @@ def main() -> None:
                         "valid_graph_rate": valid / len(scores),
                         "remaining_node_ratio_mean": statistics.fmean(node_ratios),
                         "remaining_node_ratio_minimum": min(node_ratios),
+                        "remaining_semantic_node_ratio_mean": statistics.fmean(semantic_ratios),
+                        "remaining_coordinate_node_ratio_mean": statistics.fmean(coordinate_ratios),
                         "changed_elements_mean": statistics.fmean(changed),
                         "scores": scores,
                         **authentication,

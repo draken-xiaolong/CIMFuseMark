@@ -20,8 +20,15 @@ ROOT = Path(__file__).resolve().parent
 DATA_ROOT = ROOT / "data"
 
 
-def _tensorize(graph, relations, device):
-    return graph_tensors(graph, relations, device)
+def _tensorize(graph, relations, device, relation_mode="typed", feature_mode="full"):
+    x, edge_index, edge_type = graph_tensors(graph, relations, device)
+    if relation_mode == "no_edges":
+        edge_index, edge_type = edge_index[:, :0], edge_type[:0]
+    elif relation_mode == "untyped":
+        edge_type = torch.zeros_like(edge_type)
+    if feature_mode == "geometry":
+        x = x.clone(); x[:, 8:] = 0.0
+    return x, edge_index, edge_type
 
 
 def _curriculum_levels(config: dict, attack: str, progress: float) -> list[float]:
@@ -40,6 +47,8 @@ def main() -> None:
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--output-prefix", default="rgcn_plateau_robust")
+    parser.add_argument("--relation-mode", choices=("typed", "untyped", "no_edges"), default="typed")
+    parser.add_argument("--feature-mode", choices=("full", "geometry"), default="full")
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
     if args.epochs is not None:
@@ -81,8 +90,10 @@ def main() -> None:
         all_graphs += [graph for record in records for family in record["bank"].values() for graph in family.values()]
         relations = relation_vocabulary(all_graphs)
         for record in records:
-            record["clean_tensor"] = _tensorize(record["clean"], relations, device)
-            record["bank_tensor"] = {family: {level: _tensorize(graph, relations, device)
+            record["clean_tensor"] = _tensorize(record["clean"], relations, device,
+                                                  args.relation_mode, args.feature_mode)
+            record["bank_tensor"] = {family: {level: _tensorize(graph, relations, device,
+                                                                  args.relation_mode, args.feature_mode)
                                                for level, graph in levels.items()}
                                      for family, levels in record["bank"].items()}
 
@@ -137,11 +148,13 @@ def main() -> None:
 
         output = {"config": config, "device": str(device), "models": len(records),
                   "relations": relations, "model_digest": model_digest(model), "history": history,
+                  "relation_mode": args.relation_mode, "feature_mode": args.feature_mode,
                   "training_protocol": "clean plus three forced attack-family views; curriculum up to 60% object deletion"}
         result_root = ROOT / "results"; result_root.mkdir(parents=True, exist_ok=True)
         (result_root / f"{args.output_prefix}_training.json").write_text(json.dumps(output, indent=2), encoding="utf-8")
         torch.save({"state_dict": model.state_dict(), "relations": relations, "config": config,
-                    "relation_mode": "typed", "feature_mode": "full", "training_protocol": output["training_protocol"]},
+                    "relation_mode": args.relation_mode, "feature_mode": args.feature_mode,
+                    "training_protocol": output["training_protocol"]},
                    result_root / f"{args.output_prefix}.pt")
         print(json.dumps({"checkpoint": str(result_root / f'{args.output_prefix}.pt'),
                           "model_digest": output["model_digest"]}))

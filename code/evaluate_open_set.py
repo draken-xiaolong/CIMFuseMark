@@ -41,7 +41,14 @@ def main() -> None:
     model.load_state_dict(checkpoint["state_dict"]); model.eval()
     def fingerprint(item):
         graph = build_citygml_graph((DATA_ROOT / item["path"]).resolve())
-        return model.fingerprint(model.encode(*graph_tensors(graph, relations, device)))
+        x, edge_index, edge_type = graph_tensors(graph, relations, device)
+        if checkpoint.get("relation_mode") == "no_edges":
+            edge_index, edge_type = edge_index[:, :0], edge_type[:0]
+        elif checkpoint.get("relation_mode") == "untyped":
+            edge_type = torch.zeros_like(edge_type)
+        if checkpoint.get("feature_mode") == "geometry":
+            x = x.clone(); x[:, 8:] = 0.0
+        return model.fingerprint(model.encode(x, edge_index, edge_type))
     with torch.no_grad():
         registered_bits = {item["id"]: fingerprint(item) for item in registered}
         calibration_bits = {item["id"]: fingerprint(item) for item in calibration}

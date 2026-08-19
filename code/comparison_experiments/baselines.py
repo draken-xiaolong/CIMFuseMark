@@ -16,6 +16,7 @@ from time import perf_counter
 import numpy as np
 
 from cimfusemark.core import _local_name
+from cimfusemark import build_citygml_graph, graph_fingerprint
 
 
 def citygml_points(path: str | Path) -> np.ndarray:
@@ -133,8 +134,20 @@ class Hu26Adapted(Baseline):
         return np.concatenate(parts)
 
 
+class NonLearnedRelationGraph(Baseline):
+    """Permutation-invariant CIM semantic/relation graph baseline."""
+
+    def __init__(self, bits: int = 256):
+        super().__init__("nonlearned_relation_graph", "CIMFuseMark graph baseline",
+                         "native CityGML semantic/relation graph; no learned parameters", bits)
+
+    def fingerprint(self, path: str | Path) -> np.ndarray:
+        encoded = graph_fingerprint(build_citygml_graph(path), bits=self.bits)
+        return np.fromiter((value == "1" for value in encoded), dtype=np.uint8)
+
+
 def all_baselines() -> list[Baseline]:
-    return [Jiang18(), Lee21(), Wang19Adapted(), Hu26Adapted()]
+    return [Jiang18(), Lee21(), Wang19Adapted(), Hu26Adapted(), NonLearnedRelationGraph()]
 
 
 def bit_similarity(left: np.ndarray, right: np.ndarray) -> float:

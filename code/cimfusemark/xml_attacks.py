@@ -230,7 +230,7 @@ def attack_citygml_xml(input_path: str | Path, output_path: str | Path, attack: 
                 if shuffled != children:
                     parent[:] = shuffled
                     changed += 1
-    elif attack in {"translation", "scale", "rotation_z", "quantization", "coordinate_noise"}:
+    elif attack in {"translation", "scale", "coordinate_unit", "rotation_z", "quantization", "coordinate_noise"}:
         coordinates = _coordinate_elements(root)
         all_values = [float(value) for element in coordinates for value in element.text.split()]
         triples = list(zip(all_values[0::3], all_values[1::3], all_values[2::3]))
@@ -244,6 +244,7 @@ def attack_citygml_xml(input_path: str | Path, output_path: str | Path, attack: 
             for x, y, z in zip(values[0::3], values[1::3], values[2::3]):
                 if attack == "translation": x, y, z = x + 123.4, y - 56.7, z + 8.9
                 elif attack == "scale": x, y, z = x * 3.7, y * 3.7, z * 3.7
+                elif attack == "coordinate_unit": x, y, z = x * severity, y * severity, z * severity
                 elif attack == "rotation_z":
                     angle = math.radians(severity if severity else 37)
                     c, s = math.cos(angle), math.sin(angle)

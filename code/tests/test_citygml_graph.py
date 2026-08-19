@@ -58,7 +58,8 @@ class CityGMLGraphTests(unittest.TestCase):
         attacks = (("lod2_to_lod1", 1.0), ("hierarchy_flatten", 0.5),
                    ("relation_delete", 0.5), ("semantic_relabel", 0.5),
                    ("spatial_crop", 0.5), ("building_add", 0.5),
-                   ("id_rename", 1.0), ("cityjson_roundtrip", 1.0))
+                   ("id_rename", 1.0), ("object_reorder", 1.0),
+                   ("coordinate_unit", 0.001), ("cityjson_roundtrip", 1.0))
         with tempfile.TemporaryDirectory() as directory:
             for attack, severity in attacks:
                 path = Path(directory) / f"{attack}.gml"
