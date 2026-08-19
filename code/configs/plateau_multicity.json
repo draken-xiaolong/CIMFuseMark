@@ -1,0 +1,69 @@
+{
+  "dataset": "Project PLATEAU Japan multicity CityGML benchmark",
+  "catalog_api": "https://api.plateauview.mlit.go.jp/datacatalog/plateau-datasets",
+  "license_url": "https://www.mlit.go.jp/plateau/site-policy/",
+  "buildings_per_tile": 8,
+  "minimum_boundary_nodes": 3,
+  "max_rich_buildings_per_direct_source": 96,
+  "max_rich_buildings_per_archive_source": 128,
+  "max_archive_gml_scans": 12,
+  "sources": [
+    {
+      "id": "chiyoda_53394519", "city_code": "13101", "region": "Tokyo Chiyoda",
+      "year": 2025, "specification": "5.0", "split": "train", "kind": "gml",
+      "url": "https://assets.cms.plateau.reearth.io/assets/5d/dc07c5-ace7-465a-9c99-53f6d78f6164/13101_chiyoda-ku_pref_2025_citygml_1_op/udx/bldg/53394519_bldg_6697_op.gml"
+    },
+    {
+      "id": "minato_53393640", "city_code": "13103", "region": "Tokyo Minato",
+      "year": 2025, "specification": "5.0", "split": "train", "kind": "gml",
+      "url": "https://assets.cms.plateau.reearth.io/assets/ea/d75459-6d62-4a1f-8081-317603bd5f8d/13103_minato-ku_pref_2025_citygml_1_op/udx/bldg/53393640_bldg_6697_op.gml"
+    },
+    {
+      "id": "shinjuku_53394517", "city_code": "13104", "region": "Tokyo Shinjuku",
+      "year": 2025, "specification": "5.0", "split": "train", "kind": "gml",
+      "url": "https://assets.cms.plateau.reearth.io/assets/84/48ebed-93d8-4196-bdda-e1db9590d3d1/13104_shinjuku-ku_pref_2025_citygml_1_op/udx/bldg/53394517_bldg_6697_op.gml"
+    },
+    {
+      "id": "saitama_2025", "city_code": "11100", "region": "Saitama",
+      "year": 2025, "specification": "5.0", "split": "train", "kind": "zip",
+      "file_size": 2516277839,
+      "url": "https://assets.cms.plateau.reearth.io/assets/65/77eae6-8d0f-411a-aecb-abe26d464fa8/11100_saitama-shi_city_2025_citygml_1_op.zip"
+    },
+    {
+      "id": "yokohama_2024", "city_code": "14100", "region": "Yokohama",
+      "year": 2024, "specification": "4.1", "split": "validation", "kind": "zip",
+      "file_size": 2777093929,
+      "url": "https://assets.cms.plateau.reearth.io/assets/04/96d45a-a30b-4c9f-88c0-c1323b5a0f86/14100_yokohama-shi_city_2024_citygml_2_op.zip"
+    },
+    {
+      "id": "kawasaki_2022", "city_code": "14130", "region": "Kawasaki",
+      "year": 2022, "specification": "4.1", "split": "validation", "kind": "zip",
+      "file_size": 1851264826,
+      "url": "https://assets.cms.plateau.reearth.io/assets/40/25bd0a-f174-4f55-a9bd-0e6868ece0ae/14130_kawasaki-shi_city_2022_citygml_4_op.zip"
+    },
+    {
+      "id": "osaka_2025", "city_code": "27100", "region": "Osaka",
+      "year": 2025, "specification": "5.0", "split": "test", "kind": "zip",
+      "file_size": 1580421888,
+      "url": "https://assets.cms.plateau.reearth.io/assets/10/a0aecb-67d1-4463-92d5-d67c99f3b8b6/27100_osaka-shi_city_2025_citygml_1_op.zip"
+    },
+    {
+      "id": "fukuoka_2024", "city_code": "40130", "region": "Fukuoka",
+      "year": 2024, "specification": "4.1", "split": "test", "kind": "zip",
+      "file_size": 992977577,
+      "url": "https://assets.cms.plateau.reearth.io/assets/c5/263250-3d72-486d-8b76-f8c62aaaca03/40130_fukuoka-shi_city_2024_citygml_2_op.zip"
+    },
+    {
+      "id": "hiroshima_2024", "city_code": "34100", "region": "Hiroshima",
+      "year": 2024, "specification": "4.1", "split": "test", "kind": "zip",
+      "file_size": 1262692101,
+      "url": "https://assets.cms.plateau.reearth.io/assets/cc/d28a0b-63c2-4da8-a8e2-2dc20fc263dc/34100_hiroshima-shi_city_2024_citygml_1_op.zip"
+    },
+    {
+      "id": "sendai_2024", "city_code": "04100", "region": "Sendai",
+      "year": 2024, "specification": "4.1", "split": "test", "kind": "zip",
+      "file_size": 1575758369,
+      "url": "https://assets.cms.plateau.reearth.io/assets/33/3feee9-fb3f-4c08-8f19-a45c75700e6d/04100_sendai-shi_city_2024_citygml_1_op.zip"
+    }
+  ]
+}

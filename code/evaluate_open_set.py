@@ -52,19 +52,30 @@ def main() -> None:
                   for value in registered_bits.values()]
         impostor_scores.extend(scores); impostor_maxima[item["id"]] = max(scores)
     threshold = quantile(list(impostor_maxima.values()), 0.95)
+    pair_threshold = quantile(impostor_scores, 0.95)
     output = {"protocol": {"registered_split": args.registered_split,
                             "calibration_split": args.calibration_split,
                             "registered_models": len(registered), "calibration_models": len(calibration),
                             "threshold_rule": "q95 of each calibration impostor's maximum registered similarity"},
-              "open_set": {"threshold": threshold, "pair_mean": statistics.fmean(impostor_scores),
-                           "pair_q95": quantile(impostor_scores, .95),
+              "open_set": {"threshold": threshold, "pair_threshold": pair_threshold,
+                           "pair_mean": statistics.fmean(impostor_scores),
+                           "pair_q95": pair_threshold,
                            "maximum_mean": statistics.fmean(impostor_maxima.values()),
-                           "maximum_max": max(impostor_maxima.values()), "impostor_maxima": impostor_maxima}}
+                           "maximum_max": max(impostor_maxima.values()),
+                           "observed_open_set_far": sum(score >= threshold for score in impostor_maxima.values()) /
+                                                    len(impostor_maxima),
+                           "observed_pair_far": sum(score >= pair_threshold for score in impostor_scores) /
+                                                len(impostor_scores),
+                           "impostor_maxima": impostor_maxima}}
     if args.curves:
         curves = json.loads(Path(args.curves).read_text(encoding="utf-8"))["curves"]
         output["fixed_threshold_attacks"] = {
             attack: [{"intensity": point["intensity"],
-                      "frr": sum(score < threshold for score in point["scores"]) / len(point["scores"])}
+                      "frr_open_set": sum(score < threshold for score in point["scores"]) / len(point["scores"]),
+                      "tar_open_set": sum(score >= threshold for score in point["scores"]) / len(point["scores"]),
+                      "frr_pair_threshold": sum(score < pair_threshold for score in point["scores"]) /
+                                            len(point["scores"]),
+                      "models": len(point["scores"])}
                      for point in points] for attack, points in curves.items()}
     target = Path(args.output); target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(output, indent=2), encoding="utf-8")

@@ -54,6 +54,29 @@ class CityGMLGraphTests(unittest.TestCase):
                 self.assertGreater(len(attacked.nodes), 0)
                 self.assertGreater(mutation["changed_elements"], 0)
 
+    def test_cim_specific_attacks_are_parseable(self):
+        attacks = (("lod2_to_lod1", 1.0), ("hierarchy_flatten", 0.5),
+                   ("relation_delete", 0.5), ("semantic_relabel", 0.5),
+                   ("spatial_crop", 0.5), ("building_add", 0.5),
+                   ("id_rename", 1.0), ("cityjson_roundtrip", 1.0))
+        with tempfile.TemporaryDirectory() as directory:
+            for attack, severity in attacks:
+                path = Path(directory) / f"{attack}.gml"
+                mutation = attack_citygml_xml(DATA, path, attack, severity)
+                attacked = build_citygml_graph(path)
+                self.assertGreater(len(attacked.nodes), 0, attack)
+                if attack != "spatial_crop":  # The bundled fixture contains one building, which must be retained.
+                    self.assertGreater(mutation["changed_elements"], 0, attack)
+
+    def test_lod_downgrade_removes_boundary_nodes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "lod1.gml"
+            attack_citygml_xml(DATA, path, "lod2_to_lod1", 1.0)
+            attacked = build_citygml_graph(path)
+            self.assertFalse({node.node_type for node in attacked.nodes} & {
+                "WallSurface", "RoofSurface", "GroundSurface"})
+            self.assertGreater(attacked.metadata["coordinate_count"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

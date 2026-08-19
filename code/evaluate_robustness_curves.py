@@ -28,6 +28,14 @@ DEFAULT_SWEEPS = {
     "rotation_z": [30.0, 60.0, 90.0, 120.0, 180.0],
     "coordinate_noise": [0.0001, 0.0005, 0.001, 0.002, 0.005],
     "sequential": [0.10, 0.20, 0.40, 0.60],
+    "lod2_to_lod1": [1.0],
+    "hierarchy_flatten": [0.20, 0.40, 0.60, 0.80, 1.00],
+    "relation_delete": [0.20, 0.40, 0.60, 0.80, 1.00],
+    "semantic_relabel": [0.10, 0.20, 0.40, 0.60, 0.80],
+    "spatial_crop": [0.10, 0.20, 0.40, 0.60, 0.80],
+    "building_add": [0.10, 0.20, 0.40, 0.60, 0.80],
+    "id_rename": [1.0],
+    "cityjson_roundtrip": [1.0],
 }
 
 
@@ -53,6 +61,7 @@ def main() -> None:
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--attacks", nargs="+", choices=tuple(DEFAULT_SWEEPS),
                         help="Only evaluate selected attack families")
+    parser.add_argument("--work-root", help="Directory for temporary attacked CityGML files")
     args = parser.parse_args()
 
     device = torch.device(args.device)
@@ -85,7 +94,9 @@ def main() -> None:
                            for left, right in itertools.combinations(selected, 2)]
         rejection_threshold = quantile(negative_scores, 0.95) if negative_scores else None
         curves = {}
-        with tempfile.TemporaryDirectory(prefix="cimfusemark_curves_") as temporary:
+        work_root = Path(args.work_root).resolve() if args.work_root else None
+        if work_root: work_root.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="cimfusemark_curves_", dir=work_root) as temporary:
             temporary_root = Path(temporary)
             selected_sweeps = {name: DEFAULT_SWEEPS[name] for name in args.attacks} if args.attacks else DEFAULT_SWEEPS
             for attack, levels in selected_sweeps.items():

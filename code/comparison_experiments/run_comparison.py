@@ -30,6 +30,7 @@ def main() -> None:
     parser.add_argument("--attacks", nargs="+", choices=tuple(DEFAULT_SWEEPS))
     parser.add_argument("--output", default=str(CODE_ROOT / "results" / "traditional_baseline_comparison.json"))
     parser.add_argument("--seed", type=int, default=2026)
+    parser.add_argument("--work-root", help="Directory for temporary attacked CityGML files")
     args = parser.parse_args()
     manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
     items = [item for item in manifest["models"] if item.get("split") == args.split]
@@ -40,7 +41,9 @@ def main() -> None:
                            "seed": args.seed, "attacks": sweeps,
                            "note": "Mesh-only papers are reported as explicit CityGML adaptations."},
               "methods": {}}
-    with tempfile.TemporaryDirectory(prefix="cim_baseline_comparison_") as temporary:
+    work_root = Path(args.work_root).resolve() if args.work_root else None
+    if work_root: work_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="cim_baseline_comparison_", dir=work_root) as temporary:
         temporary_root = Path(temporary)
         attack_paths = {}
         for attack, levels in sweeps.items():
