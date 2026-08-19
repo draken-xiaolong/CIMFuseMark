@@ -23,6 +23,14 @@ ATTACKS = [
     ("semantic_relabel", "Semantic relabeling"), ("building_add", "Building addition"),
 ]
 
+BASELINES = [
+    ("jiang18_citygml_radial_histogram", "Jiang18", "#6F6F6F", ":", "^"),
+    ("lee21_spherical_skew", "Lee21-adapted", "#8B6DAA", "-.", "v"),
+    ("wang19_multifeature_adapted", "Wang19-adapted", "#D88A28", ":", "D"),
+    ("hu26_radial_fusion_adapted", "Hu26-adapted", "#3A9D78", "-.", "P"),
+    ("nonlearned_relation_graph", "Nonlearned graph", "#7B5A45", "--", "x"),
+]
+
 
 def load(path: Path): return json.loads(path.read_text(encoding="utf-8"))
 
@@ -53,18 +61,26 @@ def attack_map(report: dict) -> dict:
             for name, rows in report["curves"].items()}
 
 
-def robustness(base: dict, personalized: dict, stem: Path) -> list[dict]:
-    style(); base_map, personal_map = attack_map(base), attack_map(personalized)
+def robustness(base: dict, baseline_report: dict, stem: Path) -> list[dict]:
+    style(); base_map = attack_map(base)
+    baseline_maps = {key: {name: {float(row["intensity"]): row for row in values}
+                           for name, values in baseline_report["methods"][key]["curves"].items()}
+                     for key, *_ in BASELINES}
     fig, axes = plt.subplots(4, 3, figsize=(7.2, 8.05), sharey=True); axes = axes.ravel()
     rows = []
     for panel, (ax, (attack, title)) in enumerate(zip(axes, ATTACKS)):
-        levels = sorted(set(base_map.get(attack, {})) & set(personal_map.get(attack, {})))
+        levels = sorted(base_map.get(attack, {}))
         x = np.arange(len(levels)); base_y = [base_map[attack][level]["similarity_mean"] for level in levels]
-        personal_y = [personal_map[attack][level]["similarity_mean"] for level in levels]
-        ax.plot(x, base_y, color="#3569A8", linestyle="--", marker="o", markersize=3,
-                markerfacecolor="white", linewidth=1.25, label="Lite Base")
-        ax.plot(x, personal_y, color="#C83E4D", linestyle="-", marker="s", markersize=3,
-                linewidth=1.35, label="Lite + personalized projection")
+        ax.plot(x, base_y, color="#C83E4D", linestyle="-", marker="s", markersize=3,
+                linewidth=1.55, label="CIMFuseMark-Lite", zorder=8)
+        row_by_level = {level: {"attack": attack, "intensity": level, "cimfusemark_lite": value}
+                        for level, value in zip(levels, base_y)}
+        for key, label, color, linestyle, marker in BASELINES:
+            available = baseline_maps[key].get(attack, {})
+            baseline_y = [available[level]["positive_mean"] for level in levels]
+            ax.plot(x, baseline_y, color=color, linestyle=linestyle, marker=marker,
+                    markersize=2.3, linewidth=.9, alpha=.9, label=label)
+            for level, value in zip(levels, baseline_y): row_by_level[level][key] = value
         labels = [f"{level:g}" for level in levels]
         ax.set_xticks(x); ax.set_xticklabels(labels, rotation=35 if len(labels) > 5 else 0,
                                              ha="right" if len(labels) > 5 else "center")
@@ -73,17 +89,15 @@ def robustness(base: dict, personalized: dict, stem: Path) -> list[dict]:
         ax.text(-0.15, 1.04, chr(97+panel), transform=ax.transAxes, fontsize=7.5,
                 fontweight="bold", va="bottom")
         if panel % 3 == 0: ax.set_ylabel("Mean NC")
-        rows.extend({"attack": attack, "intensity": level, "base_mean_nc": by,
-                     "personalized_mean_nc": py, "delta_nc": py-by}
-                    for level, by, py in zip(levels, base_y, personal_y))
+        rows.extend(row_by_level[level] for level in levels)
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(.5, .965), ncol=2,
-               handlelength=2.7, columnspacing=1.7)
-    fig.suptitle("CIMFuseMark-Lite robustness under CityGML attacks", y=.995,
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(.5, .94), ncol=3,
+               handlelength=2.4, columnspacing=1.2)
+    fig.suptitle("CIMFuseMark-Lite robustness under CityGML attacks", y=1.01,
                  fontsize=9.2, fontweight="bold")
-    fig.text(.5, .016, "NC is the normalized bit agreement between the original and attacked zero-watermark fingerprints.",
+    fig.text(.5, .016, "All methods use the same 64 CityGML tiles and attacked XML files; mesh methods are explicit CityGML adaptations.",
              ha="center", fontsize=5.6, color="#555555")
-    fig.subplots_adjust(left=.08, right=.985, bottom=.07, top=.92, wspace=.18, hspace=.54)
+    fig.subplots_adjust(left=.08, right=.985, bottom=.07, top=.84, wspace=.18, hspace=.54)
     save_all(fig, stem)
     return rows
 
@@ -153,9 +167,10 @@ def uniqueness(base_curves: dict, personal_curves: dict, manifest: dict, stem: P
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-curves", required=True); parser.add_argument("--personal-curves", required=True)
+    parser.add_argument("--baselines", required=True)
     parser.add_argument("--manifest", required=True); parser.add_argument("--output", required=True)
     args = parser.parse_args(); output = Path(args.output); output.mkdir(parents=True, exist_ok=True)
-    robust_rows = robustness(load(Path(args.base_curves)), load(Path(args.personal_curves)), output/"cimfusemark_lite_robustness_grid")
+    robust_rows = robustness(load(Path(args.base_curves)), load(Path(args.baselines)), output/"cimfusemark_lite_robustness_grid")
     unique_rows = uniqueness(load(Path(args.base_curves)), load(Path(args.personal_curves)), load(Path(args.manifest)), output/"cimfusemark_lite_uniqueness_matrix")
     for name, rows in (("cimfusemark_lite_robustness.csv", robust_rows), ("cimfusemark_lite_uniqueness.csv", unique_rows)):
         with (output/name).open("w", newline="", encoding="utf-8") as handle:
