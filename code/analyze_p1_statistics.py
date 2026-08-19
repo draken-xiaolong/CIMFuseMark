@@ -6,11 +6,31 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import random
 import statistics
 from pathlib import Path
 
-from run_benchmark import auc_from_scores, eer_from_scores, quantile
+import numpy as np
+
+from run_benchmark import quantile
+
+
+def fast_auc(positive: list[float], negative: list[float]) -> float:
+    """Equivalent Mann--Whitney AUC without the quadratic pair loop."""
+    positives = np.asarray(positive); negatives = np.sort(np.asarray(negative))
+    lower = np.searchsorted(negatives, positives, side="left")
+    upper = np.searchsorted(negatives, positives, side="right")
+    return float(np.sum(lower + 0.5 * (upper-lower)) / (len(positives)*len(negatives)))
+
+
+def fast_eer(positive: list[float], negative: list[float]) -> float:
+    """Exact discrete EER with binary searches over sorted score arrays."""
+    positives, negatives = np.sort(np.asarray(positive)), np.sort(np.asarray(negative))
+    thresholds = np.unique(np.concatenate((positives, negatives)))
+    fnr = np.searchsorted(positives, thresholds, side="left") / len(positives)
+    fpr = (len(negatives)-np.searchsorted(negatives, thresholds, side="left")) / len(negatives)
+    eer = (fnr+fpr)/2; difference = np.abs(fnr-fpr)
+    index = min(range(len(thresholds)), key=lambda i: (difference[i], eer[i], thresholds[i]))
+    return float(eer[index])
 
 
 def load(path: Path) -> dict:
@@ -28,27 +48,27 @@ def fixed_map(report: dict) -> dict[tuple[str, float], dict]:
 
 
 def bootstrap_multiseed(curves: list[dict], opens: list[dict], iterations: int, seed: int) -> dict:
-    rng = random.Random(seed); maps = [point_map(item) for item in curves]; fixed = [fixed_map(item) for item in opens]
+    rng = np.random.default_rng(seed); maps = [point_map(item) for item in curves]
     keys = sorted(set.intersection(*(set(item) for item in maps)))
     output = {}
     for key in keys:
         rows = [item[key] for item in maps]; estimates = {name: [] for name in ("auc", "eer", "tar", "far", "frr")}
         for _ in range(iterations):
-            chosen = [rng.randrange(len(rows)) for _ in rows]
+            chosen = rng.integers(0, len(rows), size=len(rows)).tolist()
             positives, negatives = [], []
             tar_values, far_values = [], []
             for index in chosen:
                 row = rows[index]; negative = curves[index]["protocol"]["negative_scores"]
-                positives.extend(row["scores"][rng.randrange(len(row["scores"]))] for _ in row["scores"])
-                negatives.extend(negative[rng.randrange(len(negative))] for _ in negative)
+                positives.extend(rng.choice(row["scores"], size=len(row["scores"]), replace=True).tolist())
+                negatives.extend(rng.choice(negative, size=len(negative), replace=True).tolist())
                 threshold = opens[index]["open_set"]["thresholds"]["far_5pct"]
-                sampled = [row["scores"][rng.randrange(len(row["scores"]))] for _ in row["scores"]]
+                sampled = rng.choice(row["scores"], size=len(row["scores"]), replace=True).tolist()
                 tar_values.append(sum(value >= threshold for value in sampled) / len(sampled))
                 source_maxima = list(opens[index]["open_set"]["impostor_maxima"].values())
-                sampled_maxima = [source_maxima[rng.randrange(len(source_maxima))] for _ in source_maxima]
+                sampled_maxima = rng.choice(source_maxima, size=len(source_maxima), replace=True).tolist()
                 far_values.append(sum(value >= threshold for value in sampled_maxima) / len(sampled_maxima))
-            estimates["auc"].append(auc_from_scores(positives, negatives))
-            estimates["eer"].append(eer_from_scores(positives, negatives)["eer"])
+            estimates["auc"].append(fast_auc(positives, negatives))
+            estimates["eer"].append(fast_eer(positives, negatives))
             estimates["tar"].append(statistics.fmean(tar_values)); estimates["frr"].append(1-statistics.fmean(tar_values))
             # Thresholds remain frozen per seed while validation impostor maxima are resampled.
             estimates["far"].append(statistics.fmean(far_values))
