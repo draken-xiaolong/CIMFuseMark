@@ -115,13 +115,15 @@ def write_efficiency_csv(efficiency: dict, target: Path) -> None:
                              "peak_gpu_mib": model["peak_gpu_memory_bytes"] / 2**20})
 
 
-def write_report(rows: list[dict], stats: dict, efficiency: dict, output: Path) -> None:
+def write_report(rows: list[dict], stats: dict, efficiency: dict, download: dict | None, output: Path) -> None:
     groups: dict[str, list[dict]] = defaultdict(list)
     for row in rows: groups[row["group"]].append(row)
     reference = next(row for row in rows if row["id"] == "full_seed2026")
     best_graph = max(groups["graph"], key=lambda row: float(row["auc_mean"]))
     training = [row for row in efficiency.get("training_runs", []) if row.get("training_seconds")]
     train_mean = sum(row["training_seconds"] for row in training) / len(training) if training else float("nan")
+    peak_gpu = max((row.get("peak_gpu_memory_bytes") or 0 for row in training), default=0) / 2**30
+    peak_rss = max((row.get("peak_process_rss_bytes") or 0 for row in training), default=0) / 2**30
     lines = ["# P1 mechanism and statistical experiment report", "",
              f"- Completed experiment entries: {len(rows)}/24.",
              f"- Full-model mean core AUC: {float(reference['auc_mean']):.4f}; mean TAR@FAR=5%: {float(reference['tar_far5_mean']):.4f}.",
@@ -129,12 +131,21 @@ def write_report(rows: list[dict], stats: dict, efficiency: dict, output: Path) 
              f"- Bootstrap resamples per attack: {stats['bootstrap_iterations']}; seeds: {', '.join(stats['seed_ids'])}.",
              f"- Mean measured training-only duration: {train_mean:.2f} s over {len(training)} newly measured runs.", "",
              "## Separated pipeline costs", "",
+             f"- Training peak GPU allocation: {peak_gpu:.2f} GiB; process peak RSS: {peak_rss:.2f} GiB.",
              f"- XML parsing: {efficiency['xml_parse_ms']['mean']:.3f} ms/model (mean).",
              f"- Graph construction estimate: {efficiency['graph_construction_estimate_ms']['mean']:.3f} ms/model (mean)."]
+    if download:
+        lines.append(f"- Uncached dataset download: {download['bytes']/2**30:.2f} GiB in "
+                     f"{download['elapsed_seconds']:.2f} s ({download['protocol']}).")
     for name, model in efficiency["models"].items():
         lines.append(f"- {name}: {model['trainable_parameters']:,} parameters, "
                      f"{model['inference_ms_mean']:.3f} ms/model inference, "
                      f"{model['models_per_second']:.1f} models/s for the measured 64-model pass.")
+    for name, runtime in efficiency.get("traditional_runtime_ms", {}).items():
+        lines.append(f"- {name}: {runtime:.3f} ms/model end-to-end handcrafted fingerprint extraction.")
+    if efficiency.get("personalization"):
+        lines.append(f"- Personalized registration: {efficiency['personalization']['elapsed_seconds']:.3f} s "
+                     "for the 64-model registry plus validation background.")
     lines.extend(["", "The numerical source of every plot and table is retained in the generated CSV/JSON files. "
                   "Ablation conclusions must follow the measured ranking; typed relation propagation is not claimed "
                   "as beneficial unless it exceeds no-edge and untyped alternatives.", ""])
@@ -145,16 +156,18 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--statistics", required=True)
     parser.add_argument("--efficiency", required=True)
+    parser.add_argument("--download")
     parser.add_argument("--output", required=True)
     args = parser.parse_args(); output = Path(args.output); output.mkdir(parents=True, exist_ok=True)
     stats = read_json(Path(args.statistics)); efficiency = read_json(Path(args.efficiency))
+    download = read_json(Path(args.download)) if args.download else None
     rows = read_rows(Path(args.statistics).with_name("p1_ablation_summary.csv"))
     for group in ("loss", "feature", "graph"):
         save_ablation(rows, group, output / f"p1_{group}_ablation.png")
     save_multiseed(stats, output / "p1_multiseed_bootstrap.png")
     save_scaling(efficiency, output / "p1_efficiency_scaling.png")
     write_efficiency_csv(efficiency, output / "p1_efficiency.csv")
-    write_report(rows, stats, efficiency, output / "P1_COMPLETION_REPORT.md")
+    write_report(rows, stats, efficiency, download, output / "P1_COMPLETION_REPORT.md")
     print(json.dumps({"output": str(output), "experiments": len(rows), "figures": 5}))
 
 
