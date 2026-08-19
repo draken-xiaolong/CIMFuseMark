@@ -16,7 +16,7 @@ from pathlib import Path
 import torch
 
 from cimfusemark import attack_citygml_xml, build_citygml_graph
-from cimfusemark.rgcn import CIMFuseRGCN, graph_tensors, model_digest, relation_vocabulary
+from cimfusemark.rgcn import create_model, graph_tensors, model_digest, relation_vocabulary
 from cimfusemark.robust_losses import (bit_separation_loss, embedding_tail_loss,
                                        multi_positive_nt_xent, robust_bit_loss)
 
@@ -49,6 +49,7 @@ def main() -> None:
     parser.add_argument("--output-prefix", default="rgcn_plateau_robust")
     parser.add_argument("--relation-mode", default="typed")
     parser.add_argument("--feature-mode", default="full")
+    parser.add_argument("--encoder-type", choices=("rgcn", "gcn", "graphsage", "gat", "relgat"))
     parser.add_argument("--graph-cache-dir", default=str(ROOT / "results" / "p1_graph_cache"),
                         help="Cache for deterministic preprocessed training graphs; pass an empty value to disable")
     args = parser.parse_args()
@@ -57,6 +58,8 @@ def main() -> None:
         config["epochs"] = args.epochs
     if args.seed is not None:
         config["seed"] = args.seed
+    if args.encoder_type is not None:
+        config["encoder_type"] = args.encoder_type
     seed = int(config["seed"])
     random.seed(seed); torch.manual_seed(seed)
     device = torch.device(args.device)
@@ -118,8 +121,7 @@ def main() -> None:
 
         input_dim = records[0]["clean_tensor"][0].shape[1]
         preprocessing_seconds = time.perf_counter() - started
-        model = CIMFuseRGCN(input_dim, int(config["hidden_dim"]), int(config["embedding_dim"]),
-                            len(relations), int(config["fingerprint_bits"]), seed).to(device)
+        model = create_model(input_dim, config, len(relations), seed).to(device)
         optimizer = torch.optim.AdamW(model.parameters(), lr=float(config["learning_rate"]),
                                       weight_decay=float(config["weight_decay"]))
         families = list(attacks)
@@ -177,11 +179,15 @@ def main() -> None:
                   "training_seconds": time.perf_counter() - training_started,
                   "peak_gpu_memory_bytes": (torch.cuda.max_memory_allocated(device) if device.type == "cuda" else 0),
                   "peak_process_rss_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024),
+                  "encoder_type": config.get("encoder_type", "rgcn"),
+                  "trainable_parameters": sum(parameter.numel() for parameter in model.parameters()
+                                              if parameter.requires_grad),
                   "relation_mode": args.relation_mode, "feature_mode": args.feature_mode,
                   "training_protocol": "clean plus three forced attack-family views; curriculum up to 60% object deletion"}
         result_root = ROOT / "results"; result_root.mkdir(parents=True, exist_ok=True)
         (result_root / f"{args.output_prefix}_training.json").write_text(json.dumps(output, indent=2), encoding="utf-8")
         torch.save({"state_dict": model.state_dict(), "relations": relations, "config": config,
+                    "encoder_type": config.get("encoder_type", "rgcn"),
                     "relation_mode": args.relation_mode, "feature_mode": args.feature_mode,
                     "training_protocol": output["training_protocol"]},
                    result_root / f"{args.output_prefix}.pt")

@@ -4,7 +4,7 @@ from pathlib import Path
 import torch
 
 from cimfusemark import build_citygml_graph
-from cimfusemark.rgcn import CIMFuseRGCN, graph_tensors, relation_vocabulary
+from cimfusemark.rgcn import CIMFuseRGCN, ENCODER_TYPES, graph_tensors, relation_vocabulary
 from cimfusemark.robust_losses import (bit_separation_loss, embedding_tail_loss,
                                        multi_positive_nt_xent, robust_bit_loss)
 from cimfusemark.personalization import codebook_similarity, keyed_codebook
@@ -21,6 +21,16 @@ class RGCNTests(unittest.TestCase):
         self.assertEqual(tuple(embedding.shape), (24,))
         self.assertTrue(torch.isfinite(embedding).all())
         self.assertEqual(tuple(model.fingerprint(embedding).shape), (32,))
+
+    def test_all_encoder_variants(self):
+        graph = build_citygml_graph(DATA); relations = relation_vocabulary([graph])
+        tensors = graph_tensors(graph, relations, "cpu", feature_mode="geometry_depth")
+        for encoder_type in ENCODER_TYPES:
+            model = CIMFuseRGCN(tensors[0].shape[1], 16, 24, len(relations), 32,
+                                encoder_type=encoder_type)
+            embedding = model.encode(*tensors)
+            self.assertEqual(tuple(embedding.shape), (24,), encoder_type)
+            self.assertTrue(torch.isfinite(embedding).all(), encoder_type)
 
     def test_robust_losses_prefer_matching_views(self):
         clean = torch.nn.functional.normalize(torch.randn(3, 8), dim=1)

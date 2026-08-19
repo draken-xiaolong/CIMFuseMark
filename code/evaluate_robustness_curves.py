@@ -14,7 +14,7 @@ from pathlib import Path
 import torch
 
 from cimfusemark import attack_citygml_xml, build_citygml_graph
-from cimfusemark.rgcn import CIMFuseRGCN, graph_tensors
+from cimfusemark.rgcn import create_model, graph_tensors
 from run_benchmark import auc_from_scores, eer_from_scores, quantile
 
 ROOT = Path(__file__).resolve().parent
@@ -88,10 +88,10 @@ def main() -> None:
     for item in selected:
         clean_graphs[item["id"]] = build_citygml_graph((DATA_ROOT / item["path"]).resolve())
     input_dim = len(next(iter(clean_graphs.values())).nodes[0].features)
-    model = CIMFuseRGCN(
-        input_dim, int(config["hidden_dim"]), int(config["embedding_dim"]),
-        max(relations.values(), default=0) + 1, int(config["fingerprint_bits"]), int(config["seed"]),
-    ).to(device)
+    if "encoder_type" in checkpoint:
+        config = {**config, "encoder_type": checkpoint["encoder_type"]}
+    model = create_model(input_dim, config, max(relations.values(), default=0) + 1,
+                         int(config["seed"])).to(device)
     model.load_state_dict(checkpoint["state_dict"])
     model.eval()
 
@@ -173,6 +173,9 @@ def main() -> None:
             "manifest": str(args.manifest), "checkpoint": str(args.checkpoint),
             "split": args.split, "models": len(selected), "device": str(device),
             "relation_mode": relation_mode, "feature_mode": feature_mode,
+            "encoder_type": config.get("encoder_type", "rgcn"),
+            "trainable_parameters": sum(parameter.numel() for parameter in model.parameters()
+                                        if parameter.requires_grad),
             "fingerprint_bits": int(config["fingerprint_bits"]),
             "negative_pairs": len(negative_scores),
             "negative_mean": statistics.fmean(negative_scores) if negative_scores else None,

@@ -26,6 +26,8 @@ FEATURE_GROUPS = {
     "full": set(range(19)),
 }
 
+ENCODER_TYPES = ("rgcn", "gcn", "graphsage", "gat", "relgat")
+
 
 def _selected_edges(graph: CIMGraph, relation_mode: str, seed: int):
     edges = list(graph.edges)
@@ -92,14 +94,91 @@ class RelGraphConv(nn.Module):
         return output + aggregated / degree.clamp_min(1).unsqueeze(1)
 
 
+class MeanGraphConv(nn.Module):
+    """Small dependency-free GCN/GraphSAGE layer used for fair screening."""
+    def __init__(self, in_dim: int, out_dim: int, sage: bool = False):
+        super().__init__()
+        self.sage = sage
+        self.linear = nn.Linear(in_dim * (2 if sage else 1), out_dim)
+
+    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, _edge_type: torch.Tensor) -> torch.Tensor:
+        if edge_index.numel() == 0:
+            neighbours = torch.zeros_like(x)
+        else:
+            source, target = edge_index
+            neighbours = torch.zeros_like(x); neighbours.index_add_(0, target, x[source])
+            degree = torch.zeros(len(x), dtype=x.dtype, device=x.device)
+            degree.index_add_(0, target, torch.ones_like(target, dtype=x.dtype))
+            neighbours = neighbours / degree.clamp_min(1).unsqueeze(1)
+        if self.sage:
+            return self.linear(torch.cat([x, neighbours], dim=1))
+        return self.linear(x + neighbours)
+
+
+class GraphAttentionConv(nn.Module):
+    """Multi-head GAT with optional relation embeddings in messages and attention."""
+    def __init__(self, in_dim: int, out_dim: int, relation_count: int,
+                 heads: int = 4, relational: bool = False):
+        super().__init__()
+        if out_dim % heads:
+            raise ValueError("out_dim must be divisible by attention heads")
+        self.heads = heads; self.head_dim = out_dim // heads; self.relational = relational
+        self.linear = nn.Linear(in_dim, out_dim, bias=False)
+        self.self_linear = nn.Linear(in_dim, out_dim)
+        self.att_source = nn.Parameter(torch.empty(heads, self.head_dim))
+        self.att_target = nn.Parameter(torch.empty(heads, self.head_dim))
+        if relational:
+            self.relation = nn.Embedding(relation_count, out_dim)
+            self.att_relation = nn.Parameter(torch.empty(heads, self.head_dim))
+        else:
+            self.relation = None; self.register_parameter("att_relation", None)
+        nn.init.xavier_uniform_(self.att_source); nn.init.xavier_uniform_(self.att_target)
+        if self.att_relation is not None: nn.init.xavier_uniform_(self.att_relation)
+
+    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_type: torch.Tensor) -> torch.Tensor:
+        residual = self.self_linear(x)
+        if edge_index.numel() == 0:
+            return residual
+        source, target = edge_index
+        projected = self.linear(x).view(len(x), self.heads, self.head_dim)
+        messages = projected[source]
+        relation = None
+        if self.relation is not None:
+            relation = self.relation(edge_type).view(-1, self.heads, self.head_dim)
+            messages = messages + relation
+        logits = (projected[source] * self.att_source).sum(-1) + \
+                 (projected[target] * self.att_target).sum(-1)
+        if relation is not None:
+            logits = logits + (relation * self.att_relation).sum(-1)
+        logits = F.leaky_relu(logits, 0.2)
+        # Segment softmax without optional scatter dependencies.
+        weights = torch.zeros_like(logits)
+        for node in torch.unique(target):
+            mask = target == node
+            weights[mask] = torch.softmax(logits[mask], dim=0)
+        aggregated = torch.zeros((len(x), self.heads, self.head_dim), dtype=x.dtype, device=x.device)
+        aggregated.index_add_(0, target, messages * weights.unsqueeze(-1))
+        return residual + aggregated.reshape(len(x), -1)
+
+
 class CIMFuseRGCN(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int, embedding_dim: int,
-                 relation_count: int, fingerprint_bits: int, projection_key: int = 2026):
+                 relation_count: int, fingerprint_bits: int, projection_key: int = 2026,
+                 encoder_type: str = "rgcn", attention_heads: int = 4):
         super().__init__()
         self.projection_key = projection_key
+        self.encoder_type = encoder_type
         self.input = nn.Sequential(nn.Linear(input_dim, hidden_dim), nn.LayerNorm(hidden_dim), nn.GELU())
-        self.conv1 = RelGraphConv(hidden_dim, hidden_dim, relation_count)
-        self.conv2 = RelGraphConv(hidden_dim, hidden_dim, relation_count)
+        if encoder_type == "rgcn":
+            layer = lambda: RelGraphConv(hidden_dim, hidden_dim, relation_count)
+        elif encoder_type in {"gcn", "graphsage"}:
+            layer = lambda: MeanGraphConv(hidden_dim, hidden_dim, encoder_type == "graphsage")
+        elif encoder_type in {"gat", "relgat"}:
+            layer = lambda: GraphAttentionConv(hidden_dim, hidden_dim, relation_count,
+                                                attention_heads, encoder_type == "relgat")
+        else:
+            raise ValueError(f"Unknown encoder type: {encoder_type}")
+        self.conv1 = layer(); self.conv2 = layer()
         self.pool_score = nn.Linear(hidden_dim, 1)
         self.readout = nn.Sequential(
             nn.Linear(hidden_dim * 3, embedding_dim), nn.LayerNorm(embedding_dim), nn.GELU(),
@@ -132,3 +211,11 @@ def model_digest(model: nn.Module) -> str:
     for name, tensor in sorted(model.state_dict().items()):
         digest.update(name.encode()); digest.update(tensor.detach().cpu().numpy().tobytes())
     return digest.hexdigest()[:16]
+
+
+def create_model(input_dim: int, config: dict, relation_count: int, seed: int) -> CIMFuseRGCN:
+    return CIMFuseRGCN(
+        input_dim, int(config["hidden_dim"]), int(config["embedding_dim"]), relation_count,
+        int(config["fingerprint_bits"]), seed, config.get("encoder_type", "rgcn"),
+        int(config.get("attention_heads", 4)),
+    )
