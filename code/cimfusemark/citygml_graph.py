@@ -42,6 +42,7 @@ class GraphNode:
     point_count: int
     attribute_count: int
     features: list[float]
+    extended_features: list[float]
 
 
 @dataclass(frozen=True)
@@ -117,6 +118,37 @@ def _feature_vector(points: list[Point], center: Point, scale: float, depth: int
     ]
 
 
+def _extended_feature_vector(points: list[Point], scale: float, polygons: int,
+                             subtree_size: int) -> list[float]:
+    """Complexity, invariant scale, and radial-frequency candidates (3+5+4)."""
+    unique_points = len(set(points))
+    complexity = [
+        math.log1p(unique_points) / 10.0,
+        math.log1p(polygons) / 5.0,
+        math.log1p(subtree_size) / 5.0,
+    ]
+    if points:
+        center = tuple(statistics.fmean(point[axis] for point in points) for axis in range(3))
+        centered = [(x-center[0], y-center[1], z-center[2]) for x, y, z in points]
+        covariance = [[statistics.fmean(p[i] * p[j] for p in centered) for j in range(3)] for i in range(3)]
+        eigenvalues = sorted((max(0.0, value) for value in _eigenvalues_symmetric_3x3(covariance)), reverse=True)
+        lengths = [math.sqrt(value) / scale for value in eigenvalues]
+        volume = math.sqrt(max(math.prod(eigenvalues), 0.0)) / max(scale ** 3, 1e-12)
+        surface = sum(math.sqrt(max(eigenvalues[i] * eigenvalues[j], 0.0))
+                      for i, j in ((0, 1), (0, 2), (1, 2))) / max(scale ** 2, 1e-12)
+        radii = [math.dist(point, center) / scale for point in points]
+        histogram = [0.0] * 8
+        upper = max(max(radii), 1e-12)
+        for radius in radii:
+            histogram[min(7, int(8 * radius / upper))] += 1.0 / len(radii)
+        frequency = [sum(value * math.cos(math.pi * (index + 0.5) * k / 8.0)
+                         for index, value in enumerate(histogram))
+                     for k in range(1, 5)]
+    else:
+        lengths, volume, surface, frequency = [0.0] * 3, 0.0, 0.0, [0.0] * 4
+    return [*complexity, *lengths, math.log1p(volume), math.log1p(surface), *frequency]
+
+
 def build_citygml_graph(path: str | Path, spatial_k: int = 3) -> CIMGraph:
     """Build an object hierarchy graph plus XLink and proximity relations."""
     path = Path(path)
@@ -137,6 +169,7 @@ def build_citygml_graph(path: str | Path, spatial_k: int = 3) -> CIMGraph:
     depths: list[int] = []
     own_points: list[list[Point]] = [[] for _ in object_elements]
     attribute_counts = [0 for _ in object_elements]
+    polygon_counts = [0 for _ in object_elements]
     edges: set[GraphEdge] = set()
 
     for index, element in enumerate(object_elements):
@@ -171,14 +204,20 @@ def build_citygml_graph(path: str | Path, spatial_k: int = 3) -> CIMGraph:
             continue
         if name in {"pos", "posList"}:
             own_points[owner].extend(_parse_points(element))
+        elif name in {"Polygon", "Triangle", "Rectangle"}:
+            polygon_counts[owner] += 1
         elif len(element) == 0 and (element.text or "").strip() and name not in {"lowerCorner", "upperCorner"}:
             attribute_counts[owner] += 1
 
     aggregate_points = [list(points) for points in own_points]
+    aggregate_polygons = list(polygon_counts)
+    subtree_sizes = [1 for _ in object_elements]
     for index in range(len(object_elements) - 1, -1, -1):
         parent = parents[index]
         if parent is not None:
             aggregate_points[parent].extend(aggregate_points[index])
+            aggregate_polygons[parent] += aggregate_polygons[index]
+            subtree_sizes[parent] += subtree_sizes[index]
 
     all_points = [point for points in own_points for point in points]
     if not all_points:
@@ -197,6 +236,8 @@ def build_citygml_graph(path: str | Path, spatial_k: int = 3) -> CIMGraph:
             node_id=node_ids[index], node_type=node_type, depth=depths[index], parent=parents[index],
             point_count=len(points), attribute_count=attribute_counts[index],
             features=_feature_vector(points, center, scale, depths[index], attribute_counts[index], node_type),
+            extended_features=_extended_feature_vector(points, scale, aggregate_polygons[index],
+                                                       subtree_sizes[index]),
         ))
 
     for element in root.iter():

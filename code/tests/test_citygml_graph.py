@@ -2,8 +2,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import torch
+
 from cimfusemark import attack_citygml_xml, build_citygml_graph, graph_fingerprint, similarity
-from cimfusemark.rgcn import FEATURE_GROUPS, graph_tensors, relation_vocabulary
+from cimfusemark.rgcn import EXTENDED_FEATURE_DIMS, FEATURE_GROUPS, graph_tensors, relation_vocabulary
 
 DATA = Path(__file__).parents[1] / "data" / "Building_CityGML3.0_LOD2_with_several_attributes.gml"
 
@@ -87,6 +89,10 @@ class CityGMLGraphTests(unittest.TestCase):
         self.assertTrue((full[0][:, :8] == geometry[0][:, :8]).all())
         self.assertEqual(set(FEATURE_GROUPS), {"geometry", "geometry_type", "geometry_attributes",
                                               "geometry_depth", "geometry_boundary", "full"})
+        for mode, extra in EXTENDED_FEATURE_DIMS.items():
+            enhanced = graph_tensors(self.graph, relations, "cpu", feature_mode=mode)
+            self.assertEqual(enhanced[0].shape[1], full[0].shape[1] + extra)
+            self.assertTrue(torch.isfinite(enhanced[0]).all())
         no_edges = graph_tensors(self.graph, relations, "cpu", relation_mode="no_edges")
         hierarchy = graph_tensors(self.graph, relations, "cpu", relation_mode="hierarchy_only")
         dropped = graph_tensors(self.graph, relations, "cpu", relation_mode="edge_drop_40")

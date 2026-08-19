@@ -26,6 +26,12 @@ FEATURE_GROUPS = {
     "full": set(range(19)),
 }
 
+EXTENDED_FEATURE_DIMS = {
+    "geometry_depth_complexity": 3,
+    "geometry_depth_complexity_scale": 8,
+    "geometry_depth_complexity_scale_frequency": 12,
+}
+
 ENCODER_TYPES = ("rgcn", "gcn", "graphsage", "gat", "relgat")
 
 
@@ -56,12 +62,18 @@ def _selected_edges(graph: CIMGraph, relation_mode: str, seed: int):
 def graph_tensors(graph: CIMGraph, relations: dict[str, int], device: str | torch.device,
                   relation_mode: str = "typed", feature_mode: str = "full", seed: int = 2026):
     x = torch.tensor([node.features for node in graph.nodes], dtype=torch.float32, device=device)
-    if feature_mode not in FEATURE_GROUPS:
+    extended_dim = EXTENDED_FEATURE_DIMS.get(feature_mode)
+    base_mode = "geometry_depth" if extended_dim is not None else feature_mode
+    if base_mode not in FEATURE_GROUPS:
         raise ValueError(f"Unknown feature mode: {feature_mode}")
-    keep = FEATURE_GROUPS[feature_mode]
+    keep = FEATURE_GROUPS[base_mode]
     if len(keep) < x.shape[1]:
         drop = [index for index in range(x.shape[1]) if index not in keep]
         x[:, drop] = 0.0
+    if extended_dim is not None:
+        extended = torch.tensor([node.extended_features[:extended_dim] for node in graph.nodes],
+                                dtype=torch.float32, device=device)
+        x = torch.cat([x, extended], dim=1)
     edges = _selected_edges(graph, relation_mode, seed)
     if edges:
         edge_index = torch.tensor([[edge.source for edge in edges], [edge.target for edge in edges]],
