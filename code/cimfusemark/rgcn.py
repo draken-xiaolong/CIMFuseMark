@@ -35,6 +35,42 @@ EXTENDED_FEATURE_DIMS = {
 ENCODER_TYPES = ("rgcn", "gcn", "graphsage", "gat", "relgat")
 
 
+def lgfm_graph_tensors(graph: CIMGraph, relations: dict[str, int],
+                       device: str | torch.device, seed: int = 2026):
+    """CIM counterpart of LiteGeoFuseMark's multimodal LightGraph payload."""
+    base = torch.tensor([node.features for node in graph.nodes], dtype=torch.float32, device=device)
+    extended = torch.tensor([node.extended_features for node in graph.nodes],
+                            dtype=torch.float32, device=device)
+    # Geometry, semantic and frequency branches remain explicit, as in LGFM.
+    x_geo = base[:, :8]
+    x_sem = base[:, 8:19]
+    x_freq = extended[:, :12]
+    edges = _selected_edges(graph, "typed", seed)
+    if edges:
+        edge_index = torch.tensor([[e.source for e in edges], [e.target for e in edges]],
+                                  dtype=torch.long, device=device)
+        edge_type = torch.tensor([relations[e.relation] for e in edges],
+                                 dtype=torch.long, device=device)
+    else:
+        edge_index = torch.zeros((2, 0), dtype=torch.long, device=device)
+        edge_type = torch.zeros(0, dtype=torch.long, device=device)
+    roots = []
+    for index, node in enumerate(graph.nodes):
+        root = index
+        while graph.nodes[root].parent is not None:
+            root = int(graph.nodes[root].parent)
+        roots.append(root)
+    root_ids = {root: idx for idx, root in enumerate(sorted(set(roots)))}
+    cluster = torch.tensor([root_ids[root] for root in roots], dtype=torch.long, device=device)
+    # Fixed-size, normalized graph evidence. Means and standard deviations avoid raw-size bias.
+    g_sem = torch.cat([x_sem[:, :4].mean(0), x_sem[:, :4].std(0, unbiased=False)])
+    structural = torch.cat([
+        x_geo[:, [0, 1, 5, 7]].mean(0),
+        x_geo[:, [0, 1, 5, 7]].std(0, unbiased=False),
+    ])
+    return x_geo, x_sem, x_freq, edge_index, edge_type, cluster, g_sem, structural
+
+
 def _selected_edges(graph: CIMGraph, relation_mode: str, seed: int):
     edges = list(graph.edges)
     if relation_mode == "no_edges":
@@ -221,6 +257,46 @@ class CIMFuseRGCN(nn.Module):
         return (self.projection @ embedding >= 0).to(torch.uint8)
 
 
+class CIMLiteGeoFuse(nn.Module):
+    """Faithful LiteGeoFuseMark architecture adapted only at the CIM input boundary."""
+    def __init__(self, fingerprint_bits: int, projection_key: int = 2026,
+                 embedding_dim: int = 256, dropout: float = 0.1):
+        super().__init__()
+        self.projection_key = projection_key
+        self.encoder_type = "lgfm"
+        self.enc_geo = nn.Sequential(nn.Linear(8, 32), nn.LayerNorm(32), nn.GELU())
+        self.enc_sem = nn.Sequential(nn.Linear(11, 16), nn.LayerNorm(16), nn.GELU())
+        self.enc_freq = nn.Sequential(nn.Linear(12, 16), nn.LayerNorm(16), nn.GELU())
+        self.fuse = nn.Sequential(nn.Linear(64, 64), nn.LayerNorm(64), nn.GELU())
+        self.graph = MeanGraphConv(64, 64)
+        self.graph_norm = nn.LayerNorm(64)
+        self.dropout = nn.Dropout(dropout)
+        self.pool_score = nn.Linear(64, 1)
+        self.readout = nn.Sequential(nn.Linear(64 * 4 + 8 + 8, embedding_dim),
+                                     nn.LayerNorm(embedding_dim))
+        generator = torch.Generator(device="cpu"); generator.manual_seed(projection_key)
+        projection = F.normalize(torch.randn(fingerprint_bits, embedding_dim, generator=generator), dim=1)
+        self.register_buffer("projection", projection, persistent=True)
+
+    def encode(self, x_geo, x_sem, x_freq, edge_index, edge_type, cluster, g_sem, g_struct):
+        h = self.fuse(torch.cat([self.enc_geo(x_geo), self.enc_sem(x_sem), self.enc_freq(x_freq)], dim=1))
+        h = self.graph_norm(h + self.dropout(F.gelu(self.graph(h, edge_index, edge_type))))
+        mean = h.mean(0); maximum = h.max(0).values
+        weights = torch.softmax(self.pool_score(h).squeeze(1), dim=0)
+        attention = (h * weights.unsqueeze(1)).sum(0)
+        count = int(cluster.max().item()) + 1 if cluster.numel() else 1
+        sums = torch.zeros(count, h.size(1), device=h.device).index_add_(0, cluster, h)
+        sizes = torch.zeros(count, device=h.device).index_add_(0, cluster, torch.ones_like(cluster, dtype=h.dtype))
+        region = (sums / sizes.clamp_min(1).unsqueeze(1)).mean(0)
+        return F.normalize(self.readout(torch.cat([mean, maximum, attention, region, g_sem, g_struct])), dim=0)
+
+    def soft_bits(self, embedding: torch.Tensor, temperature: float = 0.1) -> torch.Tensor:
+        return torch.tanh((self.projection @ embedding) / temperature)
+
+    def fingerprint(self, embedding: torch.Tensor) -> torch.Tensor:
+        return (self.projection @ embedding >= 0).to(torch.uint8)
+
+
 def model_digest(model: nn.Module) -> str:
     digest = hashlib.sha256()
     for name, tensor in sorted(model.state_dict().items()):
@@ -229,6 +305,10 @@ def model_digest(model: nn.Module) -> str:
 
 
 def create_model(input_dim: int, config: dict, relation_count: int, seed: int) -> CIMFuseRGCN:
+    if config.get("encoder_type") == "lgfm":
+        return CIMLiteGeoFuse(int(config["fingerprint_bits"]), seed,
+                              int(config.get("embedding_dim", 256)),
+                              float(config.get("dropout", 0.1)))
     return CIMFuseRGCN(
         input_dim, int(config["hidden_dim"]), int(config["embedding_dim"]), relation_count,
         int(config["fingerprint_bits"]), seed, config.get("encoder_type", "rgcn"),

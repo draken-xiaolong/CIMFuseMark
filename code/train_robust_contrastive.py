@@ -16,7 +16,8 @@ from pathlib import Path
 import torch
 
 from cimfusemark import attack_citygml_xml, build_citygml_graph
-from cimfusemark.rgcn import create_model, graph_tensors, model_digest, relation_vocabulary
+from cimfusemark.rgcn import (create_model, graph_tensors, lgfm_graph_tensors,
+                              model_digest, relation_vocabulary)
 from cimfusemark.robust_losses import (bit_margin_loss, bit_separation_loss,
                                        embedding_tail_loss, multi_positive_nt_xent,
                                        robust_bit_loss, soft_nc_loss)
@@ -26,6 +27,8 @@ DATA_ROOT = ROOT / "data"
 
 
 def _tensorize(graph, relations, device, relation_mode="typed", feature_mode="full", seed=2026):
+    if feature_mode == "lgfm":
+        return lgfm_graph_tensors(graph, relations, device, seed)
     return graph_tensors(graph, relations, device, relation_mode, feature_mode, seed)
 
 
@@ -129,13 +132,18 @@ def main() -> None:
         epochs = int(config["epochs"])
         views_per_model = int(config["views_per_model"])
         training_started = time.perf_counter()
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=epochs, eta_min=float(config["learning_rate"]) * 0.05)
+        rng = random.Random(seed)
         for epoch in range(epochs):
             model.train(); optimizer.zero_grad()
             progress = epoch / max(epochs - 1, 1)
             forced = ([families[(epoch + offset) % len(families)] for offset in range(views_per_model)]
                       if families else [])
+            selected_records = (rng.sample(records, k=min(int(config.get("batch_maps", len(records))), len(records)))
+                                if config.get("batch_maps") else records)
             model_views = []
-            for record_index, record in enumerate(records):
+            for record_index, record in enumerate(selected_records):
                 tensors = [record["clean_tensor"]]
                 for view_index, family in enumerate(forced):
                     allowed = _curriculum_levels(config, family, progress)
@@ -165,7 +173,7 @@ def main() -> None:
                     float(config.get("nc_weight", 0.0)) * nc_mean +
                     float(config.get("worst_nc_weight", 0.0)) * nc_worst +
                     float(config.get("bit_margin_weight", 0.0)) * bit_margin)
-            loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); optimizer.step()
+            loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); optimizer.step(); scheduler.step()
             row = {"epoch": epoch + 1, "loss": float(loss.detach()), "contrastive": float(contrastive.detach()),
                    "bit_stability": float(stability.detach()), "embedding_tail": float(embedding_tail.detach()),
                    "bit_tail": float(bit_tail.detach()), "bit_separation": float(bit_separation.detach()),
