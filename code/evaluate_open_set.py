@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import statistics
 from pathlib import Path
 
@@ -12,10 +13,17 @@ import torch
 
 from cimfusemark import build_citygml_graph
 from cimfusemark.rgcn import CIMFuseRGCN, graph_tensors
-from run_benchmark import quantile
 
 ROOT = Path(__file__).resolve().parent
 DATA_ROOT = ROOT / "data"
+
+
+def empirical_far_threshold(scores: list[float], target_far: float) -> float:
+    """Smallest strict cutoff that admits at most floor(FAR*n) calibration scores."""
+    descending = sorted(scores, reverse=True)
+    allowed = math.floor(target_far * len(descending))
+    boundary = descending[allowed] if allowed < len(descending) else descending[-1]
+    return math.nextafter(boundary, math.inf)
 
 
 def main() -> None:
@@ -59,10 +67,10 @@ def main() -> None:
                   for value in registered_bits.values()]
         impostor_scores.extend(scores); impostor_maxima[item["id"]] = max(scores)
     maximum_scores = list(impostor_maxima.values())
-    thresholds = {"far_5pct": quantile(maximum_scores, 0.95),
-                  "far_1pct": quantile(maximum_scores, 0.99)}
-    pair_thresholds = {"far_5pct": quantile(impostor_scores, 0.95),
-                       "far_1pct": quantile(impostor_scores, 0.99)}
+    thresholds = {"far_5pct": empirical_far_threshold(maximum_scores, 0.05),
+                  "far_1pct": empirical_far_threshold(maximum_scores, 0.01)}
+    pair_thresholds = {"far_5pct": empirical_far_threshold(impostor_scores, 0.05),
+                       "far_1pct": empirical_far_threshold(impostor_scores, 0.01)}
     threshold = thresholds["far_5pct"]
     pair_threshold = pair_thresholds["far_5pct"]
     output = {"protocol": {"registered_split": args.registered_split,

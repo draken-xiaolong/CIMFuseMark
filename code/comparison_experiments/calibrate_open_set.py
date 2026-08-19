@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from comparison_experiments.baselines import all_baselines, bit_similarity
-from run_benchmark import quantile
+from evaluate_open_set import empirical_far_threshold
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = ROOT / "data"
@@ -31,7 +31,8 @@ def main() -> None:
         calibration_bits = [method.fingerprint((DATA_ROOT / item["path"]).resolve()) for item in calibration]
         maxima = [max(bit_similarity(bits, candidate) for candidate in registered_bits)
                   for bits in calibration_bits]
-        thresholds = {"far_5pct": quantile(maxima, 0.95), "far_1pct": quantile(maxima, 0.99)}
+        thresholds = {"far_5pct": empirical_far_threshold(maxima, 0.05),
+                      "far_1pct": empirical_far_threshold(maxima, 0.01)}
         method_report = report["methods"][method.name]
         method_report["open_set"] = {
             "registered_split": args.registered_split, "calibration_split": args.calibration_split,
