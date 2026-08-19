@@ -76,7 +76,7 @@ def main() -> None:
     output = {"protocol": {"registered_split": args.registered_split,
                             "calibration_split": args.calibration_split,
                             "registered_models": len(registered), "calibration_models": len(calibration),
-                            "threshold_rule": "q95 of each calibration impostor's maximum registered similarity"},
+                            "threshold_rule": "strict empirical cutoff with calibration FAR no greater than target"},
               "open_set": {"threshold": threshold, "pair_threshold": pair_threshold,
                            "thresholds": thresholds, "pair_thresholds": pair_thresholds,
                            "pair_mean": statistics.fmean(impostor_scores),
