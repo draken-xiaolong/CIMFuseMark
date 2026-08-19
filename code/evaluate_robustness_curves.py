@@ -164,6 +164,8 @@ def main() -> None:
                                            for bits in clean_bits.values()}),
             "collision_pairs": sum(score == 1.0 for score in negative_scores),
             "negative_scores": negative_scores,
+            "clean_fingerprints": {model_id: "".join("1" if int(value) else "0" for value in bits.tolist())
+                                   for model_id, bits in clean_bits.items()},
         },
         "curves": curves,
         "warning": "Attack-specific similarity curves; thresholds are not recalibrated at each intensity.",
