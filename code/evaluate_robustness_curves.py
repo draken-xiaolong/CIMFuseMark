@@ -87,7 +87,9 @@ def main() -> None:
     clean_graphs = {}
     for item in selected:
         clean_graphs[item["id"]] = build_citygml_graph((DATA_ROOT / item["path"]).resolve())
-    input_dim = len(next(iter(clean_graphs.values())).nodes[0].features)
+    first_graph = next(iter(clean_graphs.values()))
+    input_dim = graph_tensors(first_graph, relations, device, relation_mode, feature_mode,
+                              int(config["seed"]))[0].shape[1]
     if "encoder_type" in checkpoint:
         config = {**config, "encoder_type": checkpoint["encoder_type"]}
     model = create_model(input_dim, config, max(relations.values(), default=0) + 1,
