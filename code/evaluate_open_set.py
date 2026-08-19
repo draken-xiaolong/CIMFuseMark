@@ -58,13 +58,19 @@ def main() -> None:
         scores = [float((calibration_bits[item["id"]] == value).float().mean())
                   for value in registered_bits.values()]
         impostor_scores.extend(scores); impostor_maxima[item["id"]] = max(scores)
-    threshold = quantile(list(impostor_maxima.values()), 0.95)
-    pair_threshold = quantile(impostor_scores, 0.95)
+    maximum_scores = list(impostor_maxima.values())
+    thresholds = {"far_5pct": quantile(maximum_scores, 0.95),
+                  "far_1pct": quantile(maximum_scores, 0.99)}
+    pair_thresholds = {"far_5pct": quantile(impostor_scores, 0.95),
+                       "far_1pct": quantile(impostor_scores, 0.99)}
+    threshold = thresholds["far_5pct"]
+    pair_threshold = pair_thresholds["far_5pct"]
     output = {"protocol": {"registered_split": args.registered_split,
                             "calibration_split": args.calibration_split,
                             "registered_models": len(registered), "calibration_models": len(calibration),
                             "threshold_rule": "q95 of each calibration impostor's maximum registered similarity"},
               "open_set": {"threshold": threshold, "pair_threshold": pair_threshold,
+                           "thresholds": thresholds, "pair_thresholds": pair_thresholds,
                            "pair_mean": statistics.fmean(impostor_scores),
                            "pair_q95": pair_threshold,
                            "maximum_mean": statistics.fmean(impostor_maxima.values()),
@@ -73,6 +79,12 @@ def main() -> None:
                                                     len(impostor_maxima),
                            "observed_pair_far": sum(score >= pair_threshold for score in impostor_scores) /
                                                 len(impostor_scores),
+                           "observed_open_set_far_by_target": {
+                               name: sum(score >= value for score in maximum_scores) / len(maximum_scores)
+                               for name, value in thresholds.items()},
+                           "observed_pair_far_by_target": {
+                               name: sum(score >= value for score in impostor_scores) / len(impostor_scores)
+                               for name, value in pair_thresholds.items()},
                            "impostor_maxima": impostor_maxima}}
     if args.curves:
         curves = json.loads(Path(args.curves).read_text(encoding="utf-8"))["curves"]
@@ -80,6 +92,10 @@ def main() -> None:
             attack: [{"intensity": point["intensity"],
                       "frr_open_set": sum(score < threshold for score in point["scores"]) / len(point["scores"]),
                       "tar_open_set": sum(score >= threshold for score in point["scores"]) / len(point["scores"]),
+                      "tar_at_far_5pct": sum(score >= thresholds["far_5pct"] for score in point["scores"]) /
+                                         len(point["scores"]),
+                      "tar_at_far_1pct": sum(score >= thresholds["far_1pct"] for score in point["scores"]) /
+                                         len(point["scores"]),
                       "frr_pair_threshold": sum(score < pair_threshold for score in point["scores"]) /
                                             len(point["scores"]),
                       "models": len(point["scores"])}
