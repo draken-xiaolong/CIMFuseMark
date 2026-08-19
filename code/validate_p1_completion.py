@@ -37,7 +37,9 @@ def main() -> None:
         curve_report = load(curves); open_report = load(opened)
         errors = []
         if curve_report["protocol"].get("models") != 64: errors.append("core evaluation does not contain 64 test models")
-        if len(curve_report["curves"]) != 13: errors.append("core profile does not contain 13 attack families")
+        if len(curve_report["curves"]) != 10: errors.append("core profile does not contain 10 attack families")
+        if sum(len(points) for points in curve_report["curves"].values()) != 13:
+            errors.append("core profile does not contain 13 attack-strength points")
         if not finite_points(curve_report): errors.append("non-finite core metric")
         if set(curve_report["curves"]) != set(open_report["fixed_threshold_attacks"]):
             errors.append("core/open-set attack keys differ")
