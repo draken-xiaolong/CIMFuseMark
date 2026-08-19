@@ -35,8 +35,8 @@ def bootstrap_multiseed(curves: list[dict], opens: list[dict], iterations: int, 
         rows = [item[key] for item in maps]; estimates = {name: [] for name in ("auc", "eer", "tar", "far", "frr")}
         for _ in range(iterations):
             chosen = [rng.randrange(len(rows)) for _ in rows]
-            positives, negatives, maxima = [], [], []
-            tar_values = []
+            positives, negatives = [], []
+            tar_values, far_values = [], []
             for index in chosen:
                 row = rows[index]; negative = curves[index]["protocol"]["negative_scores"]
                 positives.extend(row["scores"][rng.randrange(len(row["scores"]))] for _ in row["scores"])
@@ -45,13 +45,13 @@ def bootstrap_multiseed(curves: list[dict], opens: list[dict], iterations: int, 
                 sampled = [row["scores"][rng.randrange(len(row["scores"]))] for _ in row["scores"]]
                 tar_values.append(sum(value >= threshold for value in sampled) / len(sampled))
                 source_maxima = list(opens[index]["open_set"]["impostor_maxima"].values())
-                maxima.extend(source_maxima[rng.randrange(len(source_maxima))] for _ in source_maxima)
+                sampled_maxima = [source_maxima[rng.randrange(len(source_maxima))] for _ in source_maxima]
+                far_values.append(sum(value >= threshold for value in sampled_maxima) / len(sampled_maxima))
             estimates["auc"].append(auc_from_scores(positives, negatives))
             estimates["eer"].append(eer_from_scores(positives, negatives)["eer"])
             estimates["tar"].append(statistics.fmean(tar_values)); estimates["frr"].append(1-statistics.fmean(tar_values))
-            # Thresholds are frozen per seed; report the hierarchical resample of observed validation FAR.
-            estimates["far"].append(statistics.fmean(
-                opens[index]["open_set"]["observed_open_set_far_by_target"]["far_5pct"] for index in chosen))
+            # Thresholds remain frozen per seed while validation impostor maxima are resampled.
+            estimates["far"].append(statistics.fmean(far_values))
         output[f"{key[0]}@{key[1]}"] = {
             metric: {"mean": statistics.fmean(values), "ci95": [quantile(values, 0.025), quantile(values, 0.975)]}
             for metric, values in estimates.items()}
@@ -105,12 +105,16 @@ def main() -> None:
             baseline_threshold = method["open_set"]["thresholds"]["far_5pct"]
             differences = [(left-main_threshold) - (right-baseline_threshold)
                            for left, right in zip(main["scores"], row["scores"])]
-            test = wilcoxon(differences, alternative="greater", zero_method="wilcox")
+            try:
+                test = wilcoxon(differences, alternative="greater", zero_method="wilcox")
+                statistic, pvalue = float(test.statistic), float(test.pvalue)
+            except ValueError:
+                statistic, pvalue = 0.0, 1.0
             paired[f"{attack}@{level}"] = {"best_baseline": name, "main_auc": main["auc"],
-                                             "baseline_auc": row["auc"], "statistic": float(test.statistic),
-                                             "pvalue_one_sided": float(test.pvalue),
+                                             "baseline_auc": row["auc"], "statistic": statistic,
+                                             "pvalue_one_sided": pvalue,
                                              "margin_difference_mean": statistics.fmean(differences)}
-    except (ImportError, ValueError) as error:
+    except ImportError as error:
         paired["warning"] = str(error)
     report = {"experiments": summaries, "multiseed_bootstrap": bootstrap,
               "paired_wilcoxon_authentication_margin": paired,
