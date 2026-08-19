@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import pickle
 import random
 import resource
 import tempfile
@@ -47,6 +49,8 @@ def main() -> None:
     parser.add_argument("--output-prefix", default="rgcn_plateau_robust")
     parser.add_argument("--relation-mode", default="typed")
     parser.add_argument("--feature-mode", default="full")
+    parser.add_argument("--graph-cache-dir", default=str(ROOT / "results" / "p1_graph_cache"),
+                        help="Cache for deterministic preprocessed training graphs; pass an empty value to disable")
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
     if args.epochs is not None:
@@ -72,25 +76,38 @@ def main() -> None:
     records = []
     with tempfile.TemporaryDirectory(prefix="cimfusemark_robust_") as temporary:
         temporary_root = Path(temporary)
-        for item in train_items:
-            source = (DATA_ROOT / item["path"]).resolve()
-            clean = build_citygml_graph(source)
-            bank = {}
-            for family, levels in attacks.items():
-                xml_attack = "rotation_z" if family == "rotation" else family
-                bank[family] = {}
-                for level in levels:
-                    target = temporary_root / f"{item['id']}__{family}_{level}.gml"
-                    attack_citygml_xml(source, target, xml_attack, float(level), seed=seed + len(records))
-                    try:
-                        bank[family][float(level)] = build_citygml_graph(target)
-                    except ValueError:
-                        pass
-            records.append({"id": item["id"], "clean": clean, "bank": bank})
-
-        all_graphs = [record["clean"] for record in records]
-        all_graphs += [graph for record in records for family in record["bank"].values() for graph in family.values()]
-        relations = relation_vocabulary(all_graphs)
+        cache_path = None
+        if args.graph_cache_dir:
+            signature = json.dumps({"manifest": str(Path(args.manifest).resolve()), "train_items": train_items,
+                                    "seed": seed, "attacks": attacks}, sort_keys=True).encode()
+            cache_path = Path(args.graph_cache_dir) / f"training_graphs_{hashlib.sha256(signature).hexdigest()[:16]}.pkl"
+        if cache_path and cache_path.exists():
+            cached = pickle.loads(cache_path.read_bytes())
+            records, relations = cached["records"], cached["relations"]
+            print(json.dumps({"graph_cache": "hit", "path": str(cache_path), "records": len(records)}))
+        else:
+            for item in train_items:
+                source = (DATA_ROOT / item["path"]).resolve()
+                clean = build_citygml_graph(source)
+                bank = {}
+                for family, levels in attacks.items():
+                    xml_attack = "rotation_z" if family == "rotation" else family
+                    bank[family] = {}
+                    for level in levels:
+                        target = temporary_root / f"{item['id']}__{family}_{level}.gml"
+                        attack_citygml_xml(source, target, xml_attack, float(level), seed=seed + len(records))
+                        try:
+                            bank[family][float(level)] = build_citygml_graph(target)
+                        except ValueError:
+                            pass
+                records.append({"id": item["id"], "clean": clean, "bank": bank})
+            all_graphs = [record["clean"] for record in records]
+            all_graphs += [graph for record in records for family in record["bank"].values() for graph in family.values()]
+            relations = relation_vocabulary(all_graphs)
+            if cache_path:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cache_path.write_bytes(pickle.dumps({"records": records, "relations": relations}, protocol=5))
+                print(json.dumps({"graph_cache": "write", "path": str(cache_path), "records": len(records)}))
         for record in records:
             record["clean_tensor"] = _tensorize(record["clean"], relations, device,
                                                   args.relation_mode, args.feature_mode, seed)

@@ -48,7 +48,8 @@ def main() -> None:
             config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
             run([python, str(ROOT / "train_robust_contrastive.py"), "--config", str(config_path),
                  "--manifest", args.manifest, "--device", args.device, "--output-prefix", prefix,
-                 "--relation-mode", relation_mode, "--feature-mode", feature_mode])
+                 "--relation-mode", relation_mode, "--feature-mode", feature_mode,
+                 "--graph-cache-dir", str(results / "p1_graph_cache")])
         curves = results / f"p1_{experiment_id}_core_curves.json"
         opened = results / f"p1_{experiment_id}_open_set.json"
         if not curves.exists():
