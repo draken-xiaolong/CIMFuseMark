@@ -10,9 +10,10 @@ export PYTHONPATH="${ROOT}"
 MANIFEST="${ROOT}/data/plateau_multicity_manifest.json"
 RESULTS="${ROOT}/results"
 WORK_ROOT="${CIMFUSEMARK_WORK_ROOT:-/root/autodl-tmp/CIMFuseMark_p0/attack_work}"
+ATTACK_CACHE="${CIMFUSEMARK_ATTACK_CACHE:-/root/autodl-tmp/CIMFuseMark_p0/attack_cache}"
 DEVICE="${CIMFUSEMARK_DEVICE:-cuda}"
 PYTHON="${CIMFUSEMARK_PYTHON:-python3}"
-mkdir -p "${RESULTS}" "${WORK_ROOT}"
+mkdir -p "${RESULTS}" "${WORK_ROOT}" "${ATTACK_CACHE}"
 
 if [[ -n "${CIMFUSEMARK_WAIT_PID:-}" ]]; then
   while kill -0 "${CIMFUSEMARK_WAIT_PID}" 2>/dev/null; do
@@ -53,7 +54,8 @@ for variant in separated base personalized; do
   if [[ ! -f "${curves}" ]]; then
     "${PYTHON}" "${ROOT}/evaluate_robustness_curves.py" \
       --manifest "${MANIFEST}" --checkpoint "${checkpoint}" --split test \
-      --device "${DEVICE}" --work-root "${WORK_ROOT}" --output "${curves}"
+      --device "${DEVICE}" --work-root "${WORK_ROOT}" --attack-cache "${ATTACK_CACHE}" \
+      --output "${curves}"
   fi
   "${PYTHON}" "${ROOT}/evaluate_open_set.py" \
     --manifest "${MANIFEST}" --checkpoint "${checkpoint}" \
@@ -64,7 +66,7 @@ done
 if [[ ! -f "${RESULTS}/multicity_deepsets_curves.json" ]]; then
   "${PYTHON}" "${ROOT}/evaluate_robustness_curves.py" \
     --manifest "${MANIFEST}" --checkpoint "${RESULTS}/deepsets_multicity.pt" --split test \
-    --device "${DEVICE}" --work-root "${WORK_ROOT}" \
+    --device "${DEVICE}" --work-root "${WORK_ROOT}" --attack-cache "${ATTACK_CACHE}" \
     --output "${RESULTS}/multicity_deepsets_curves.json"
 fi
 "${PYTHON}" "${ROOT}/evaluate_open_set.py" \

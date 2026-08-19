@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import itertools
 import json
 import statistics
@@ -64,6 +65,7 @@ def main() -> None:
     parser.add_argument("--attacks", nargs="+", choices=tuple(DEFAULT_SWEEPS),
                         help="Only evaluate selected attack families")
     parser.add_argument("--work-root", help="Directory for temporary attacked CityGML files")
+    parser.add_argument("--attack-cache", help="Persistent shared attacked-file cache reused across checkpoints")
     args = parser.parse_args()
 
     device = torch.device(args.device)
@@ -98,7 +100,11 @@ def main() -> None:
         curves = {}
         work_root = Path(args.work_root).resolve() if args.work_root else None
         if work_root: work_root.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="cimfusemark_curves_", dir=work_root) as temporary:
+        attack_cache = Path(args.attack_cache).resolve() if args.attack_cache else None
+        if attack_cache: attack_cache.mkdir(parents=True, exist_ok=True)
+        context = contextlib.nullcontext(str(attack_cache)) if attack_cache else \
+            tempfile.TemporaryDirectory(prefix="cimfusemark_curves_", dir=work_root)
+        with context as temporary:
             temporary_root = Path(temporary)
             selected_sweeps = {name: DEFAULT_SWEEPS[name] for name in args.attacks} if args.attacks else DEFAULT_SWEEPS
             for attack, levels in selected_sweeps.items():
@@ -108,8 +114,14 @@ def main() -> None:
                     for item in selected:
                         source = (DATA_ROOT / item["path"]).resolve()
                         attacked_path = temporary_root / f"{item['id']}__{attack}_{level}.gml"
-                        mutation = attack_citygml_xml(source, attacked_path, attack, level,
-                                                      seed=int(config["seed"]))
+                        mutation_path = attacked_path.with_suffix(attacked_path.suffix + ".mutation.json")
+                        if attacked_path.exists() and mutation_path.exists():
+                            mutation = json.loads(mutation_path.read_text(encoding="utf-8"))
+                        else:
+                            mutation = attack_citygml_xml(source, attacked_path, attack, level,
+                                                          seed=int(config["seed"]))
+                            if attack_cache:
+                                mutation_path.write_text(json.dumps(mutation), encoding="utf-8")
                         try:
                             attacked = build_citygml_graph(attacked_path)
                             bits = encode(model, attacked, relations, device, relation_mode, feature_mode)
