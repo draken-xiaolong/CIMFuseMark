@@ -163,11 +163,14 @@ class GraphAttentionConv(nn.Module):
         if relation is not None:
             logits = logits + (relation * self.att_relation).sum(-1)
         logits = F.leaky_relu(logits, 0.2)
-        # Segment softmax without optional scatter dependencies.
-        weights = torch.zeros_like(logits)
-        for node in torch.unique(target):
-            mask = target == node
-            weights[mask] = torch.softmax(logits[mask], dim=0)
+        # Vectorized segment softmax without optional torch-scatter dependencies.
+        segment_index = target[:, None].expand(-1, self.heads)
+        maxima = torch.full((len(x), self.heads), -torch.inf, dtype=x.dtype, device=x.device)
+        maxima.scatter_reduce_(0, segment_index, logits, reduce="amax", include_self=True)
+        exponentials = torch.exp(logits - maxima[target])
+        denominators = torch.zeros((len(x), self.heads), dtype=x.dtype, device=x.device)
+        denominators.index_add_(0, target, exponentials)
+        weights = exponentials / denominators[target].clamp_min(1e-12)
         aggregated = torch.zeros((len(x), self.heads, self.head_dim), dtype=x.dtype, device=x.device)
         aggregated.index_add_(0, target, messages * weights.unsqueeze(-1))
         return residual + aggregated.reshape(len(x), -1)
