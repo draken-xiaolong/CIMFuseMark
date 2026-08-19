@@ -1,0 +1,6 @@
+method,fidelity,bits,negative_mean,negative_q95,negative_max,runtime_ms_mean
+jiang18_citygml_radial_histogram,direct CityGML reproduction,64,0.6844618055555556,0.8125,0.890625,6.975824196219537
+lee21_spherical_skew,CityGML point-set adaptation,64,0.5015035962301587,0.609375,0.703125,7.453741444385095
+wang19_multifeature_adapted,CityGML adaptation; radial stability proxy replaces OSVETA/SDF,192,0.8060980902777778,0.875,0.9479166666666666,7.248549646150176
+hu26_radial_fusion_adapted,CityGML adaptation; multiscale residuals replace mesh EMD,256,0.9620496961805556,0.98828125,1.0,7.281587271416022
+nonlearned_relation_graph,native CityGML semantic/relation graph; no learned parameters,256,0.8940991598462301,0.97265625,1.0,31.466974918139115
