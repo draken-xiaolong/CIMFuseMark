@@ -3,6 +3,14 @@ data/raw/
 data/converted/
 results/
 paper/build/
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out
+paper/*.xdv
 *.log
 __pycache__/
 

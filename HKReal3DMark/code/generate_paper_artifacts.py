@@ -17,5 +17,12 @@ def main():
  A.flat[0].legend(fontsize=8);F.savefig(fig/'robustness_grid.pdf');F.savefig(fig/'robustness_grid.png',dpi=300);plt.close(F)
  u=d['uniqueness'];worst=min(q['auc'] for v in d['curves'].values() for q in v)
  (out/'results_macros.tex').write_text(f"\\newcommand{{\\ModelParams}}{{{d['parameters']:,}}}\n\\newcommand{{\\UniqueMean}}{{{u['mean']:.3f}}}\n\\newcommand{{\\UniqueQ}}{{{u['q95']:.3f}}}\n\\newcommand{{\\UniqueMax}}{{{u['max']:.3f}}}\n\\newcommand{{\\WorstAUC}}{{{worst:.3f}}}\n",encoding='utf8')
+ baseline_path=Path(a.result).with_name('baselines.json')
+ if baseline_path.exists():
+  baselines=json.loads(baseline_path.read_text());rows=[]
+  for name,v in baselines.items():rows.append((name,v['uniqueness']['q95'],min(x['auc'] for z in v['curves'].values() for x in z)))
+  rows.append(('HKReal3DMark',u['q95'],worst))
+  text=['\\begin{tabular}{lcc}\\toprule 方法 & 异源NC q95 & 最差AUC \\\\ \\midrule']+[f'{n} & {q:.3f} & {w:.3f} \\\\' for n,q,w in rows]+['\\bottomrule\\end{tabular}']
+  (out/'baseline_table.tex').write_text('\n'.join(text),encoding='utf8')
  print(json.dumps({'figure':str(fig/'robustness_grid.pdf'),'worst_auc':worst,'uniqueness':u}))
 if __name__=='__main__':main()
