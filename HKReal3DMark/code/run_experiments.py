@@ -76,7 +76,11 @@ def metrics(pos,neg):
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument("--data",default="/Volumes/SANDISK-ELE/HKReal3DMarkData/converted/hk_points"); ap.add_argument("--out",default="/Volumes/SANDISK-ELE/HKReal3DMarkData/results/final"); ap.add_argument("--epochs",type=int,default=500); ap.add_argument("--seed",type=int,default=2026); ap.add_argument("--width",type=int,default=64); ap.add_argument("--bits",type=int,default=1024); ap.add_argument("--device",default="mps" if torch.backends.mps.is_available() else "cpu"); args=ap.parse_args()
     random.seed(args.seed); np.random.seed(args.seed); torch.manual_seed(args.seed); device=torch.device(args.device)
-    root=Path(args.data); rows=json.loads((root/"manifest.json").read_text())["models"]; data=np.load(root/"points.npz")["points"]
+    root=Path(args.data); rows=json.loads((root/"manifest.json").read_text())["models"]
+    # Clean and attacked branches must enter the encoder through the identical
+    # canonicalization path; otherwise even a pure scale attack is evaluated
+    # against a differently preprocessed clean reference.
+    data=np.stack([canonical(points) for points in np.load(root/"points.npz")["points"]])
     train=np.array([i for i,r in enumerate(rows) if r["split"]=="train"]); test=np.array([i for i,r in enumerate(rows) if r["split"]=="test"])
     model=Encoder(args.width).to(device); opt=torch.optim.AdamW(model.parameters(),2e-4,weight_decay=1e-4)
     generator=torch.Generator().manual_seed(args.seed); projection=F.normalize(torch.randn(args.bits,256,generator=generator),dim=1).to(device)
