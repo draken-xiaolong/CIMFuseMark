@@ -19,7 +19,10 @@ from pathlib import Path
 for line in Path(sys.argv[1]).read_text().splitlines():
     if line.strip() and not line.lstrip().startswith('#') and '=' in line:
         key, value = line.split('=', 1); os.environ.setdefault(key.strip(), value.strip())
-db = sqlite3.connect(Path(os.environ['HK3D_DATA_ROOT']) / 'packed' / 'inventory.sqlite')
+packed = Path(os.environ['HK3D_DATA_ROOT']) / 'packed'
+pointer = packed / 'inventory.pointer'
+db_path = Path(os.environ.get('HK3D_DB_PATH') or (pointer.read_text().strip() if pointer.exists() else packed / 'inventory.sqlite'))
+db = sqlite3.connect(db_path)
 total, terminal = db.execute("select count(*),sum(status in ('done','missing')) from urls").fetchone()
 raise SystemExit(0 if total == terminal else 1)
 PY
