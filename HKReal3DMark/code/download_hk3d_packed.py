@@ -81,6 +81,7 @@ class Packed:
         if old:
             for u,kind in old:
                 self.sequence+=1;self.q.put((0 if kind=='json' else 1,self.sequence,u))
+            del old
         else:self.add(ROOT)
         for t in threads:t.start()
         self.q.join()
