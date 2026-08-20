@@ -227,13 +227,17 @@ def main() -> None:
                   "training_protocol": ("clean plus forced attack-family views; curriculum maximums=" +
                                         json.dumps({name: max(levels) for name, levels in attacks.items()}, sort_keys=True))}
         result_root = ROOT / "results"; result_root.mkdir(parents=True, exist_ok=True)
-        (result_root / f"{args.output_prefix}_training.json").write_text(json.dumps(output, indent=2), encoding="utf-8")
+        report_path = result_root / f"{args.output_prefix}_training.json"
+        checkpoint_path = result_root / f"{args.output_prefix}.pt"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        (report_path).write_text(json.dumps(output, indent=2), encoding="utf-8")
         torch.save({"state_dict": model.state_dict(), "relations": relations, "config": config,
                     "encoder_type": config.get("encoder_type", "rgcn"),
                     "relation_mode": args.relation_mode, "feature_mode": args.feature_mode,
                     "training_protocol": output["training_protocol"]},
-                   result_root / f"{args.output_prefix}.pt")
-        print(json.dumps({"checkpoint": str(result_root / f'{args.output_prefix}.pt'),
+                   checkpoint_path)
+        print(json.dumps({"checkpoint": str(checkpoint_path),
                           "model_digest": output["model_digest"]}))
 
 
