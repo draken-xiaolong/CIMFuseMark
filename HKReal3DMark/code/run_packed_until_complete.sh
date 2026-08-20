@@ -23,7 +23,17 @@ db = sqlite3.connect(Path(os.environ['HK3D_DATA_ROOT']) / 'packed' / 'inventory.
 total, terminal = db.execute("select count(*),sum(status in ('done','missing')) from urls").fetchone()
 raise SystemExit(0 if total == terminal else 1)
 PY
-  then exit 0
+  then
+    python3 "$SCRIPT_DIR/audit_packed_download.py" --root "$(python3 - "$ENV_FILE" <<'PY'
+import os, sys
+from pathlib import Path
+for line in Path(sys.argv[1]).read_text().splitlines():
+    if line.strip() and not line.lstrip().startswith('#') and '=' in line:
+        key, value = line.split('=', 1); os.environ.setdefault(key.strip(), value.strip())
+print(os.environ['HK3D_DATA_ROOT'])
+PY
+)" >>"$LOG_FILE" 2>&1
+    exit 0
   fi
   sleep 30
 done
