@@ -30,34 +30,38 @@ class Packed:
         # Earlier versions discarded JSON bodies. Re-fetch them once so the
         # hierarchy, transforms and spatial metadata remain reconstructable.
         self.db.execute("update urls set status='queued',size=null,error='requeued to retain JSON content' where type='json' and status='done' and content is null")
-        self.db.commit();self.lock=threading.Lock();self.q=queue.PriorityQueue();self.payload=queue.Queue(maxsize=workers*4);self.stop=False;self.sequence=0;self.pending_db=0
+        self.db.commit();self.lock=threading.Lock();self.q=queue.Queue();self.payload=queue.Queue(maxsize=workers*4);self.stop=False;self.pending_db=0
     def checkpoint(self,force=False):
         """Commit a bounded batch; caller must hold ``self.lock``."""
         if force or self.pending_db>=100:
             self.db.commit();self.pending_db=0
     def auth(self,u):
         s=urllib.parse.urlsplit(u);q=urllib.parse.parse_qs(s.query);q['key']=[self.key];return urllib.parse.urlunsplit((s.scheme,s.netloc,s.path,urllib.parse.urlencode(q,doseq=True),''))
-    def add(self,u):
-        u=urllib.parse.urlunsplit((*urllib.parse.urlsplit(u)[:3],'',''))
-        kind='json' if u.lower().endswith('.json') else 'payload'
+    def add_many(self,urls):
+        prepared=[]
+        for raw in urls:
+            u=urllib.parse.urlunsplit((*urllib.parse.urlsplit(raw)[:3],'',''))
+            prepared.append((u,'json' if u.lower().endswith('.json') else 'payload'))
+        prepared=list(dict.fromkeys(prepared));new_json=[]
         with self.lock:
-            cur=self.db.execute('insert or ignore into urls(url,status,type,size,error,attempts) values(?,?,?,?,?,?)',(u,'queued',kind,None,None,0))
-            if cur.rowcount:
-                self.sequence+=1;item=(0 if kind=='json' else 1,self.sequence,u)
-            else:item=None
-        if item:self.q.put(item)
+            for u,kind in prepared:
+                cur=self.db.execute('insert or ignore into urls(url,status,type,size,error,attempts) values(?,?,?,?,?,?)',(u,'queued',kind,None,None,0))
+                if cur.rowcount and kind=='json':new_json.append(u)
+        for u in new_json:self.q.put(u)
+    def add(self,u):self.add_many([u])
     def fetch(self):
         while True:
-            _,_,u=self.q.get()
+            u=self.q.get()
             if u is None:self.q.task_done();return
             try:
                 req=urllib.request.Request(self.auth(u),headers={'User-Agent':'HKReal3DMark-academic-packed/1.0'})
                 with urllib.request.urlopen(req,timeout=90) as r:data=r.read()
                 if u.lower().endswith('.json'):
-                    doc=json.loads(data);stack=[doc.get('root',doc)]
+                    doc=json.loads(data);stack=[doc.get('root',doc)];found=[]
                     while stack:
                         n=stack.pop();stack.extend(n.get('children',[]));c=n.get('content') or {};v=c.get('uri') or c.get('url')
-                        if v:self.add(urllib.parse.urljoin(u,v))
+                        if v:found.append(urllib.parse.urljoin(u,v))
+                    self.add_many(found)
                     packed_json=zlib.compress(data,6)
                     with self.lock:
                         self.db.execute('update urls set status=?,size=?,content=?,error=null where url=?',('done',len(data),packed_json,u));self.pending_db+=1;self.checkpoint()
@@ -88,18 +92,31 @@ class Packed:
             with self.lock:self.checkpoint(force=True)
             zf.close()
     def run(self):
-        # Recover queued work before adding the root.
-        old=self.db.execute("select url,type from urls where status='queued' order by type='json' desc,url").fetchall();threads=[threading.Thread(target=self.fetch,daemon=True) for _ in range(self.workers)]
+        # Phase 1 discovers and retains the complete JSON hierarchy. Payload
+        # URLs stay only in SQLite, avoiding a multi-million-item priority heap.
+        old=self.db.execute("select url from urls where type='json' and status='queued' order by url").fetchall();threads=[threading.Thread(target=self.fetch,daemon=True) for _ in range(self.workers)]
         writer=threading.Thread(target=self.write,daemon=True);writer.start()
         if old:
-            for u,kind in old:
-                self.sequence+=1;self.q.put((0 if kind=='json' else 1,self.sequence,u))
+            for (u,) in old:self.q.put(u)
             del old
         else:self.add(ROOT)
         for t in threads:t.start()
         self.q.join()
-        for _ in threads:
-            self.sequence+=1;self.q.put((2,self.sequence,None))
+        # Retry transient hierarchy failures before starting payload transfer.
+        while True:
+            retry=self.db.execute("select url from urls where type='json' and status='queued' order by url").fetchall()
+            if not retry:break
+            for (u,) in retry:self.q.put(u)
+            self.q.join()
+        # Phase 2 streams payload URLs through a bounded FIFO queue.
+        self.q.maxsize=self.workers*16;last=''
+        while True:
+            batch=self.db.execute("select url from urls where type='payload' and status='queued' and url>? order by url limit 10000",(last,)).fetchall()
+            if not batch:break
+            for (u,) in batch:self.q.put(u)
+            last=batch[-1][0]
+        self.q.join()
+        for _ in threads:self.q.put(None)
         for t in threads:t.join()
         self.payload.join();self.payload.put(None);writer.join()
         with self.lock:self.checkpoint(force=True)
