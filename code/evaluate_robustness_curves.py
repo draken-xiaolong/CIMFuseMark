@@ -14,7 +14,7 @@ from pathlib import Path
 import torch
 
 from cimfusemark import attack_citygml_xml, build_citygml_graph
-from cimfusemark.rgcn import create_model, graph_tensors
+from cimfusemark.rgcn import create_model, graph_tensors, lgfm_graph_tensors
 from run_benchmark import auc_from_scores, eer_from_scores, quantile
 
 ROOT = Path(__file__).resolve().parent
@@ -54,6 +54,10 @@ def bit_similarity(left: torch.Tensor, right: torch.Tensor) -> float:
 
 
 def encode(model, graph, relations, device, relation_mode, feature_mode):
+    if feature_mode == "lgfm":
+        tensors = lgfm_graph_tensors(
+            graph, relations, device, int(getattr(model, "projection_key", 2026)))
+        return model.fingerprint(model.encode(*tensors))
     x, edge_index, edge_type = graph_tensors(graph, relations, device, relation_mode, feature_mode,
                                              int(getattr(model, "projection_key", 2026)))
     return model.fingerprint(model.encode(x, edge_index, edge_type))
@@ -88,8 +92,9 @@ def main() -> None:
     for item in selected:
         clean_graphs[item["id"]] = build_citygml_graph((DATA_ROOT / item["path"]).resolve())
     first_graph = next(iter(clean_graphs.values()))
-    input_dim = graph_tensors(first_graph, relations, device, relation_mode, feature_mode,
-                              int(config["seed"]))[0].shape[1]
+    input_dim = (0 if feature_mode == "lgfm" else
+                 graph_tensors(first_graph, relations, device, relation_mode, feature_mode,
+                               int(config["seed"]))[0].shape[1])
     if "encoder_type" in checkpoint:
         config = {**config, "encoder_type": checkpoint["encoder_type"]}
     model = create_model(input_dim, config, max(relations.values(), default=0) + 1,
