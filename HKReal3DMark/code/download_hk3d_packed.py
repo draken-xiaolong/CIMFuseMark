@@ -112,6 +112,7 @@ class Packed:
             for (u,) in retry:self.q.put(u)
             self.q.join()
         if os.environ.get('HK3D_DISCOVER_ONLY','0').lower() in {'1','true','yes'}:
+            with self.lock:self.checkpoint(force=True)
             json_total,payload_total=self.db.execute("select sum(type='json'),sum(type='payload') from urls").fetchone()
             marker=self.out.parent/'metadata'/'payload_phase_paused.json';marker.parent.mkdir(parents=True,exist_ok=True)
             marker.write_text(json.dumps({'reason':'discover_only','json_total':json_total or 0,'payload_total':payload_total or 0,'timestamp':time.time()},indent=2),encoding='utf-8')
