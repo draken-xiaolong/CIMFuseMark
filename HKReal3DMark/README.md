@@ -28,13 +28,16 @@ export HK3D_API_KEY='你的key'
 export HK3D_DATA_ROOT='/Volumes/SANDISK-ELE/HKReal3DMarkData'
 ```
 
-## 当前阶段
+## 当前实现
 
-1. 全量遍历官方瓦片树并生成容量清单；
-2. 核对硬盘空间和预计请求数；
-3. 断点续传下载全港原始3D Tiles；
-4. 选择代表区域转换网格，建立实验划分；
-5. 重新设计局部网格patch图和攻击协议。
+1. `download_hk3d_packed.py`以SQLite保存层级清单，并将B3DM写入每片10,000文件的ZIP64，避免移动硬盘的小文件空间放大；
+2. `run_packed_until_complete.sh`负责断点恢复、临时网络错误重试和404缺失资源收敛；
+3. `prepare_hk_dataset.py`建立严格地域隔离的72/24/24实验划分；
+4. `run_experiments.py`完成学习式零水印训练、仅投影个性化与九类攻击评估；
+5. `generate_paper_artifacts.py`从正式JSON自动生成论文曲线、表格与LaTeX宏。
 
-未经全量清单确认，不直接展开全港递归下载，以避免因LoD树重复内容导致不可控占用。
+查看全港打包下载状态：
 
+```bash
+python3 code/packed_download_status.py
+```
