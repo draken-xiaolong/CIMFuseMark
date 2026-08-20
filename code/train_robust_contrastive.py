@@ -84,8 +84,13 @@ def main() -> None:
         temporary_root = Path(temporary)
         cache_path = None
         if args.graph_cache_dir:
-            signature = json.dumps({"manifest": str(Path(args.manifest).resolve()), "train_items": train_items,
-                                    "seed": seed, "attacks": attacks}, sort_keys=True).encode()
+            signature = json.dumps({"cache_format": "streamed_tensor_v2",
+                                    "manifest": str(Path(args.manifest).resolve()),
+                                    "train_items": train_items, "seed": seed, "attacks": attacks,
+                                    "feature_mode": args.feature_mode,
+                                    "relation_mode": args.relation_mode,
+                                    "encoder_type": config.get("encoder_type", "rgcn")},
+                                   sort_keys=True).encode()
             cache_path = Path(args.graph_cache_dir) / f"training_graphs_{hashlib.sha256(signature).hexdigest()[:16]}.pkl"
         if cache_path and cache_path.exists():
             cached = pickle.loads(cache_path.read_bytes())
