@@ -92,35 +92,48 @@ def main() -> None:
             records, relations = cached["records"], cached["relations"]
             print(json.dumps({"graph_cache": "hit", "path": str(cache_path), "records": len(records)}))
         else:
+            # Resolve the small relation vocabulary from clean graphs first, without
+            # retaining every attacked XML graph and its coordinate arrays in RAM.
+            relation_names = set()
             for item in train_items:
                 source = (DATA_ROOT / item["path"]).resolve()
                 clean = build_citygml_graph(source)
+                relation_names.update(edge.relation for edge in clean.edges)
+                del clean
+            relations = {name: index for index, name in enumerate(sorted(relation_names))}
+            for item_index, item in enumerate(train_items):
+                source = (DATA_ROOT / item["path"]).resolve()
+                clean = build_citygml_graph(source)
+                clean_tensor = _tensorize(clean, relations, "cpu",
+                                          args.relation_mode, args.feature_mode, seed)
+                del clean
                 bank = {}
                 for family, levels in attacks.items():
                     xml_attack = "rotation_z" if family == "rotation" else family
                     bank[family] = {}
                     for level in levels:
                         target = temporary_root / f"{item['id']}__{family}_{level}.gml"
-                        attack_citygml_xml(source, target, xml_attack, float(level), seed=seed + len(records))
+                        attack_citygml_xml(source, target, xml_attack, float(level), seed=seed + item_index)
                         try:
-                            bank[family][float(level)] = build_citygml_graph(target)
+                            attacked = build_citygml_graph(target)
+                            bank[family][float(level)] = _tensorize(
+                                attacked, relations, "cpu", args.relation_mode,
+                                args.feature_mode, seed)
                         except ValueError:
                             pass
-                records.append({"id": item["id"], "clean": clean, "bank": bank})
-            all_graphs = [record["clean"] for record in records]
-            all_graphs += [graph for record in records for family in record["bank"].values() for graph in family.values()]
-            relations = relation_vocabulary(all_graphs)
+                        target.unlink(missing_ok=True)
+                records.append({"id": item["id"], "clean_tensor_cpu": clean_tensor,
+                                "bank_tensor_cpu": bank})
             if cache_path:
                 cache_path.parent.mkdir(parents=True, exist_ok=True)
                 cache_path.write_bytes(pickle.dumps({"records": records, "relations": relations}, protocol=5))
                 print(json.dumps({"graph_cache": "write", "path": str(cache_path), "records": len(records)}))
         for record in records:
-            record["clean_tensor"] = _tensorize(record["clean"], relations, device,
-                                                  args.relation_mode, args.feature_mode, seed)
-            record["bank_tensor"] = {family: {level: _tensorize(graph, relations, device,
-                                                                  args.relation_mode, args.feature_mode, seed)
-                                               for level, graph in levels.items()}
-                                     for family, levels in record["bank"].items()}
+            record["clean_tensor"] = tuple(value.to(device) for value in record["clean_tensor_cpu"])
+            record["bank_tensor"] = {
+                family: {level: tuple(value.to(device) for value in tensors)
+                         for level, tensors in levels.items()}
+                for family, levels in record["bank_tensor_cpu"].items()}
 
         input_dim = records[0]["clean_tensor"][0].shape[1]
         preprocessing_seconds = time.perf_counter() - started
