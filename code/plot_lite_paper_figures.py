@@ -164,8 +164,8 @@ def uniqueness(base_curves: dict, personal_curves: dict, manifest: dict, stem: P
     cax1, cax2 = fig.add_subplot(grid[0,2]), fig.add_subplot(grid[0,4])
     nc_norm = mpl.colors.Normalize(vmin=.35, vmax=.90); delta_norm = TwoSlopeNorm(vmin=-.40, vcenter=0, vmax=.15)
     im1 = draw_matrix(axes[0], base, f"Lite Base  mean={base_stats['mean']:.2f}, q95={base_stats['q95']:.2f}, max={base_stats['max']:.2f}", "a", sequential, nc_norm, True, boundaries, labels, True)
-    draw_matrix(axes[1], personal, f"Hybrid-25 registration  mean={personal_stats['mean']:.2f}, q95={personal_stats['q95']:.2f}, max={personal_stats['max']:.2f}", "b", sequential, nc_norm, False, boundaries, labels, True)
-    im2 = draw_matrix(axes[2], delta, "Hybrid-25 − Base pairwise change", "c", diverging, delta_norm, False, boundaries, labels, False)
+    draw_matrix(axes[1], personal, f"Hybrid-10 registration  mean={personal_stats['mean']:.2f}, q95={personal_stats['q95']:.2f}, max={personal_stats['max']:.2f}", "b", sequential, nc_norm, False, boundaries, labels, True)
+    im2 = draw_matrix(axes[2], delta, "Hybrid-10 − Base pairwise change", "c", diverging, delta_norm, False, boundaries, labels, False)
     cb1 = fig.colorbar(im1, cax=cax1); cb1.set_label("Pairwise Hamming similarity", fontsize=6); cb1.ax.tick_params(labelsize=5)
     cb2 = fig.colorbar(im2, cax=cax2); cb2.set_label("Δ similarity (blue = improved)", fontsize=6); cb2.ax.tick_params(labelsize=5)
     off = ~np.eye(len(base), dtype=bool); changes = delta[off]
