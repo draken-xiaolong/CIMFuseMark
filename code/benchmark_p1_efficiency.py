@@ -14,7 +14,7 @@ from pathlib import Path
 import torch
 
 from cimfusemark import build_citygml_graph
-from cimfusemark.rgcn import create_model, graph_tensors
+from cimfusemark.rgcn import create_model, graph_tensors, lgfm_graph_tensors
 
 ROOT = Path(__file__).resolve().parent
 DATA_ROOT = ROOT / "data"
@@ -32,12 +32,20 @@ def synchronize(device):
 def load_model(path: Path, first_graph, device):
     checkpoint = torch.load(path, map_location=device, weights_only=False); config = checkpoint["config"]
     relations = checkpoint["relations"]
-    input_dim = graph_tensors(first_graph, relations, device, checkpoint.get("relation_mode", "typed"),
-                              checkpoint.get("feature_mode", "full"), int(config["seed"]))[0].shape[1]
+    feature_mode = checkpoint.get("feature_mode", "full")
+    input_dim = (0 if feature_mode == "lgfm" else
+                 graph_tensors(first_graph, relations, device, checkpoint.get("relation_mode", "typed"),
+                               feature_mode, int(config["seed"]))[0].shape[1])
     config = {**config, "encoder_type": checkpoint.get("encoder_type", config.get("encoder_type", "rgcn"))}
     model = create_model(input_dim, config, max(relations.values(), default=0)+1, int(config["seed"])).to(device)
     model.load_state_dict(checkpoint["state_dict"]); model.eval()
     return checkpoint, model, relations
+
+
+def model_tensors(graph, relations, device, relation_mode, feature_mode, seed):
+    if feature_mode == "lgfm":
+        return lgfm_graph_tensors(graph, relations, device, seed)
+    return graph_tensors(graph, relations, device, relation_mode, feature_mode, seed)
 
 
 def main() -> None:
@@ -74,7 +82,7 @@ def main() -> None:
         with torch.no_grad():
             for graph in graphs:
                 started = time.perf_counter()
-                tensors = graph_tensors(graph, relations, device, relation_mode, feature_mode,
+                tensors = model_tensors(graph, relations, device, relation_mode, feature_mode,
                                         int(checkpoint["config"]["seed"]))
                 synchronize(device); tensor_times.append(time.perf_counter()-started)
                 tensor_bytes.append(sum(t.numel()*t.element_size() for t in tensors))
@@ -94,9 +102,9 @@ def main() -> None:
             "peak_gpu_memory_bytes": torch.cuda.max_memory_allocated(device) if device.type == "cuda" else 0,
             "relation_mode": relation_mode, "feature_mode": feature_mode,
         }
-        if name == "rgcn":
+        if not report["scaling"]:
             for nodes, edges, graph in sizes:
-                tensor = graph_tensors(graph, relations, device, relation_mode, feature_mode,
+                tensor = model_tensors(graph, relations, device, relation_mode, feature_mode,
                                        int(checkpoint["config"]["seed"])); started = time.perf_counter()
                 with torch.no_grad(): model.fingerprint(model.encode(*tensor))
                 synchronize(device)
