@@ -53,7 +53,7 @@ def main() -> None:
     parser.add_argument("--output-prefix", default="rgcn_plateau_robust")
     parser.add_argument("--relation-mode", default="typed")
     parser.add_argument("--feature-mode", default="full")
-    parser.add_argument("--encoder-type", choices=("rgcn", "gcn", "graphsage", "gat", "relgat"))
+    parser.add_argument("--encoder-type", choices=("rgcn", "gcn", "graphsage", "gat", "relgat", "lgfm"))
     parser.add_argument("--graph-cache-dir", default=str(ROOT / "results" / "p1_graph_cache"),
                         help="Cache for deterministic preprocessed training graphs; pass an empty value to disable")
     args = parser.parse_args()
