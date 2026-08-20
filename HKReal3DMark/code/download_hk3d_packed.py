@@ -27,7 +27,11 @@ class Packed:
         # Earlier versions discarded JSON bodies. Re-fetch them once so the
         # hierarchy, transforms and spatial metadata remain reconstructable.
         self.db.execute("update urls set status='queued',size=null,error='requeued to retain JSON content' where type='json' and status='done' and content is null")
-        self.db.commit();self.lock=threading.Lock();self.q=queue.PriorityQueue();self.payload=queue.Queue(maxsize=workers*4);self.stop=False;self.sequence=0
+        self.db.commit();self.lock=threading.Lock();self.q=queue.PriorityQueue();self.payload=queue.Queue(maxsize=workers*4);self.stop=False;self.sequence=0;self.pending_db=0
+    def checkpoint(self,force=False):
+        """Commit a bounded batch; caller must hold ``self.lock``."""
+        if force or self.pending_db>=100:
+            self.db.commit();self.pending_db=0
     def auth(self,u):
         s=urllib.parse.urlsplit(u);q=urllib.parse.parse_qs(s.query);q['key']=[self.key];return urllib.parse.urlunsplit((s.scheme,s.netloc,s.path,urllib.parse.urlencode(q,doseq=True),''))
     def add(self,u):
@@ -52,32 +56,33 @@ class Packed:
                         n=stack.pop();stack.extend(n.get('children',[]));c=n.get('content') or {};v=c.get('uri') or c.get('url')
                         if v:self.add(urllib.parse.urljoin(u,v))
                     packed_json=zlib.compress(data,6)
-                    with self.lock:self.db.execute('update urls set status=?,size=?,content=?,error=null where url=?',('done',len(data),packed_json,u));self.db.commit()
+                    with self.lock:
+                        self.db.execute('update urls set status=?,size=?,content=?,error=null where url=?',('done',len(data),packed_json,u));self.pending_db+=1;self.checkpoint()
                 else:self.payload.put((u,data))
             except Exception as e:
                 permanent=isinstance(e,urllib.error.HTTPError) and e.code in {404,410}
-                with self.lock:self.db.execute('update urls set status=?,error=?,attempts=attempts+1 where url=?',('missing' if permanent else 'queued',str(e)[:500],u));self.db.commit()
+                with self.lock:
+                    self.db.execute('update urls set status=?,error=?,attempts=attempts+1 where url=?',('missing' if permanent else 'queued',str(e)[:500],u));self.pending_db+=1;self.checkpoint()
             self.q.task_done()
     def write(self):
         existing=[int(p.stem.rsplit('_',1)[-1]) for p in self.out.glob('payload_*.zip')]
-        shard=max(existing,default=0);zf=None;count=0;pending=0
+        shard=max(existing,default=0);zf=None;count=0
         while True:
             item=self.payload.get()
             if item is None:break
             u,data=item
             if zf is None or count>=self.shard_size:
                 if zf:
-                    with self.lock:self.db.commit()
-                    pending=0;zf.close()
+                    with self.lock:self.checkpoint(force=True)
+                    zf.close()
                 shard+=1;zf=zipfile.ZipFile(self.out/f'payload_{shard:04d}.zip','w',zipfile.ZIP_STORED,allowZip64=True);count=0
             name=urllib.parse.unquote(urllib.parse.urlsplit(u).path).split('/f2/',1)[-1]
             zf.writestr(name,data);count+=1
             with self.lock:
-                self.db.execute('update urls set status=?,size=?,error=null where url=?',('done',len(data),u));pending+=1
-                if pending>=100:self.db.commit();pending=0
+                self.db.execute('update urls set status=?,size=?,error=null where url=?',('done',len(data),u));self.pending_db+=1;self.checkpoint()
             self.payload.task_done()
         if zf:
-            with self.lock:self.db.commit()
+            with self.lock:self.checkpoint(force=True)
             zf.close()
     def run(self):
         # Recover queued work before adding the root.
@@ -94,6 +99,7 @@ class Packed:
             self.sequence+=1;self.q.put((2,self.sequence,None))
         for t in threads:t.join()
         self.payload.join();self.payload.put(None);writer.join()
+        with self.lock:self.checkpoint(force=True)
         total,done,missing,bytes_=self.db.execute("select count(*),sum(status='done'),sum(status='missing'),coalesce(sum(size),0) from urls").fetchone()
         print(json.dumps({'discovered':total,'done':done,'missing':missing,'bytes':bytes_,'complete':total==done+missing}))
 
