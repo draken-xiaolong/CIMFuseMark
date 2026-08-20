@@ -23,17 +23,21 @@ class Packed:
         self.db.execute('pragma journal_mode=WAL');self.db.execute('create table if not exists urls(url text primary key,status text,type text,size integer,error text,attempts integer default 0)')
         columns={row[1] for row in self.db.execute('pragma table_info(urls)')}
         if 'attempts' not in columns:self.db.execute('alter table urls add column attempts integer default 0')
-        self.db.commit();self.lock=threading.Lock();self.q=queue.Queue();self.payload=queue.Queue(maxsize=workers*4);self.stop=False
+        self.db.commit();self.lock=threading.Lock();self.q=queue.PriorityQueue();self.payload=queue.Queue(maxsize=workers*4);self.stop=False;self.sequence=0
     def auth(self,u):
         s=urllib.parse.urlsplit(u);q=urllib.parse.parse_qs(s.query);q['key']=[self.key];return urllib.parse.urlunsplit((s.scheme,s.netloc,s.path,urllib.parse.urlencode(q,doseq=True),''))
     def add(self,u):
         u=urllib.parse.urlunsplit((*urllib.parse.urlsplit(u)[:3],'',''))
+        kind='json' if u.lower().endswith('.json') else 'payload'
         with self.lock:
-            cur=self.db.execute('insert or ignore into urls(url,status,type,size,error,attempts) values(?,?,?,?,?,?)',(u,'queued','json' if u.lower().endswith('.json') else 'payload',None,None,0));self.db.commit()
-        if cur.rowcount:self.q.put(u)
+            cur=self.db.execute('insert or ignore into urls(url,status,type,size,error,attempts) values(?,?,?,?,?,?)',(u,'queued',kind,None,None,0))
+            if cur.rowcount:
+                self.sequence+=1;item=(0 if kind=='json' else 1,self.sequence,u)
+            else:item=None
+        if item:self.q.put(item)
     def fetch(self):
         while True:
-            u=self.q.get()
+            _,_,u=self.q.get()
             if u is None:self.q.task_done();return
             try:
                 req=urllib.request.Request(self.auth(u),headers={'User-Agent':'HKReal3DMark-academic-packed/1.0'})
@@ -72,14 +76,16 @@ class Packed:
             zf.close()
     def run(self):
         # Recover queued work before adding the root.
-        old=[r[0] for r in self.db.execute("select url from urls where status='queued'")];threads=[threading.Thread(target=self.fetch,daemon=True) for _ in range(self.workers)]
+        old=self.db.execute("select url,type from urls where status='queued' order by type='json' desc,url").fetchall();threads=[threading.Thread(target=self.fetch,daemon=True) for _ in range(self.workers)]
         writer=threading.Thread(target=self.write,daemon=True);writer.start()
-        for t in threads:t.start()
         if old:
-            for u in old:self.q.put(u)
+            for u,kind in old:
+                self.sequence+=1;self.q.put((0 if kind=='json' else 1,self.sequence,u))
         else:self.add(ROOT)
+        for t in threads:t.start()
         self.q.join()
-        for _ in threads:self.q.put(None)
+        for _ in threads:
+            self.sequence+=1;self.q.put((2,self.sequence,None))
         for t in threads:t.join()
         self.payload.join();self.payload.put(None);writer.join()
         total,done,missing,bytes_=self.db.execute("select count(*),sum(status='done'),sum(status='missing'),coalesce(sum(size),0) from urls").fetchone()
