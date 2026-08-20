@@ -111,6 +111,12 @@ class Packed:
             if not retry:break
             for (u,) in retry:self.q.put(u)
             self.q.join()
+        if os.environ.get('HK3D_DISCOVER_ONLY','0').lower() in {'1','true','yes'}:
+            json_total,payload_total=self.db.execute("select sum(type='json'),sum(type='payload') from urls").fetchone()
+            marker=self.out.parent/'metadata'/'payload_phase_paused.json';marker.parent.mkdir(parents=True,exist_ok=True)
+            marker.write_text(json.dumps({'reason':'discover_only','json_total':json_total or 0,'payload_total':payload_total or 0,'timestamp':time.time()},indent=2),encoding='utf-8')
+            print(json.dumps({'phase':'payload_paused','json_total':json_total,'payload_total':payload_total}),flush=True)
+            while True:time.sleep(300)
         # Phase 2 streams payload URLs through a bounded FIFO queue.
         self.q.maxsize=self.workers*16;last=''
         while True:

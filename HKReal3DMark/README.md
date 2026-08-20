@@ -31,6 +31,9 @@ export HK3D_DB_PATH='/Users/wangfugui/Paper/三维CIM水印/HKReal3DMarkState/in
 
 SQLite清单建议放在Mac内置APFS磁盘，不要直接在exFAT移动盘上使用WAL。
 `inventory.pointer`会记录清单的实际位置，B3DM ZIP仍保存在移动盘。
+若需先完成全港索引审计、但在确认容量前不下载payload，启动时设置
+`HK3D_DISCOVER_ONLY=1`。JSON队列归零后进程会驻留，并生成
+`metadata/payload_phase_paused.json`，不会将移动盘写满。
 
 ## 当前实现
 
