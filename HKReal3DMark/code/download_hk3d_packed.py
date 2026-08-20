@@ -21,7 +21,7 @@ class Packed:
     def __init__(self,key,out,workers,shard_size,db_path=None):
         self.key=key;self.out=out;self.workers=workers;self.shard_size=shard_size
         out.mkdir(parents=True,exist_ok=True);db_path=inventory_path(out,db_path);db_path.parent.mkdir(parents=True,exist_ok=True);write_pointer(out,db_path);self.db=sqlite3.connect(db_path,check_same_thread=False)
-        self.db.execute('pragma journal_mode=WAL');self.db.execute('create table if not exists urls(url text primary key,status text,type text,size integer,error text,attempts integer default 0,content blob,archive text,member text)')
+        self.db.execute('pragma journal_mode=WAL');self.db.execute('pragma synchronous=NORMAL');self.db.execute('pragma temp_store=MEMORY');self.db.execute('pragma cache_size=-262144');self.db.execute('pragma mmap_size=1073741824');self.db.execute('create table if not exists urls(url text primary key,status text,type text,size integer,error text,attempts integer default 0,content blob,archive text,member text)')
         columns={row[1] for row in self.db.execute('pragma table_info(urls)')}
         if 'attempts' not in columns:self.db.execute('alter table urls add column attempts integer default 0')
         if 'content' not in columns:self.db.execute('alter table urls add column content blob')
