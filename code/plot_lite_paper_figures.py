@@ -25,10 +25,13 @@ ATTACKS = [
 
 BASELINES = [
     ("jiang18_citygml_radial_histogram", "Jiang18", "#6F6F6F", ":", "^"),
-    ("lee21_spherical_skew", "Lee21-adapted", "#8B6DAA", "-.", "v"),
-    ("wang19_multifeature_adapted", "Wang19-adapted", "#D88A28", ":", "D"),
-    ("hu26_radial_fusion_adapted", "Hu26-adapted", "#3A9D78", "-.", "P"),
-    ("nonlearned_relation_graph", "Nonlearned graph", "#7B5A45", "--", "x"),
+]
+
+EMBEDDED_BASELINES = [
+    ("jiang18_blind_dct", "Blind-DCT18", "#8B6DAA", "-.", "v"),
+    ("jiang19_octree_dct_qim", "Octree-QIM19", "#D88A28", ":", "D"),
+    ("hong19_homograph", "Homograph19", "#3A9D78", "-.", "P"),
+    ("jin22_group_cqt", "CQT22", "#2878B5", "--", "o"),
 ]
 
 
@@ -61,11 +64,14 @@ def attack_map(report: dict) -> dict:
             for name, rows in report["curves"].items()}
 
 
-def robustness(base: dict, baseline_report: dict, stem: Path) -> list[dict]:
+def robustness(base: dict, baseline_report: dict, embedded_report: dict, stem: Path) -> list[dict]:
     style(); base_map = attack_map(base)
     baseline_maps = {key: {name: {float(row["intensity"]): row for row in values}
                            for name, values in baseline_report["methods"][key]["curves"].items()}
                      for key, *_ in BASELINES}
+    embedded_maps = {key: {name: {float(row["intensity"]): row for row in values}
+                           for name, values in embedded_report["methods"][key]["curves"].items()}
+                     for key, *_ in EMBEDDED_BASELINES}
     fig, axes = plt.subplots(4, 3, figsize=(7.2, 8.05), sharey=True); axes = axes.ravel()
     rows = []
     for panel, (ax, (attack, title)) in enumerate(zip(axes, ATTACKS)):
@@ -78,6 +84,12 @@ def robustness(base: dict, baseline_report: dict, stem: Path) -> list[dict]:
         for key, label, color, linestyle, marker in BASELINES:
             available = baseline_maps[key].get(attack, {})
             baseline_y = [available[level]["positive_mean"] for level in levels]
+            ax.plot(x, baseline_y, color=color, linestyle=linestyle, marker=marker,
+                    markersize=2.3, linewidth=.9, alpha=.9, label=label)
+            for level, value in zip(levels, baseline_y): row_by_level[level][key] = value
+        for key, label, color, linestyle, marker in EMBEDDED_BASELINES:
+            available = embedded_maps[key].get(attack, {})
+            baseline_y = [available[level]["similarity_mean"] for level in levels]
             ax.plot(x, baseline_y, color=color, linestyle=linestyle, marker=marker,
                     markersize=2.3, linewidth=.9, alpha=.9, label=label)
             for level, value in zip(levels, baseline_y): row_by_level[level][key] = value
@@ -95,7 +107,7 @@ def robustness(base: dict, baseline_report: dict, stem: Path) -> list[dict]:
                handlelength=2.4, columnspacing=1.2)
     fig.suptitle("CIMFuseMark-Lite robustness under CityGML attacks", y=1.01,
                  fontsize=9.2, fontweight="bold")
-    fig.text(.5, .016, "All methods use the same 64 CityGML tiles and attacked XML files; mesh methods are explicit CityGML adaptations.",
+    fig.text(.5, .016, "All methods operate natively on the same 64 CityGML tiles; embedded baselines report binary NC = 1 − BER.",
              ha="center", fontsize=5.6, color="#555555")
     fig.subplots_adjust(left=.08, right=.985, bottom=.07, top=.84, wspace=.18, hspace=.54)
     save_all(fig, stem)
@@ -168,9 +180,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-curves", required=True); parser.add_argument("--personal-curves", required=True)
     parser.add_argument("--baselines", required=True)
+    parser.add_argument("--embedded-baselines", required=True)
     parser.add_argument("--manifest", required=True); parser.add_argument("--output", required=True)
     args = parser.parse_args(); output = Path(args.output); output.mkdir(parents=True, exist_ok=True)
-    robust_rows = robustness(load(Path(args.base_curves)), load(Path(args.baselines)), output/"cimfusemark_lite_robustness_grid")
+    robust_rows = robustness(load(Path(args.base_curves)), load(Path(args.baselines)),
+                             load(Path(args.embedded_baselines)), output/"cimfusemark_lite_robustness_grid")
     unique_rows = uniqueness(load(Path(args.base_curves)), load(Path(args.personal_curves)), load(Path(args.manifest)), output/"cimfusemark_lite_uniqueness_matrix")
     for name, rows in (("cimfusemark_lite_robustness.csv", robust_rows), ("cimfusemark_lite_uniqueness.csv", unique_rows)):
         with (output/name).open("w", newline="", encoding="utf-8") as handle:

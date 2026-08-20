@@ -28,6 +28,7 @@ def main() -> None:
     parser.add_argument("--manifest", default=str(DATA_ROOT / "plateau_manifest.json"))
     parser.add_argument("--split", default="test")
     parser.add_argument("--attacks", nargs="+", choices=tuple(DEFAULT_SWEEPS))
+    parser.add_argument("--methods", nargs="+", help="Only run selected baseline identifiers")
     parser.add_argument("--output", default=str(CODE_ROOT / "results" / "traditional_baseline_comparison.json"))
     parser.add_argument("--seed", type=int, default=2026)
     parser.add_argument("--work-root", help="Directory for temporary attacked CityGML files")
@@ -54,7 +55,10 @@ def main() -> None:
                     mutation = attack_citygml_xml(source, target, attack, level, seed=args.seed)
                     attack_paths[(attack, level, item["id"])] = (target, mutation)
 
-        for method in all_baselines():
+        methods = all_baselines()
+        if args.methods:
+            methods = [method for method in methods if method.name in set(args.methods)]
+        for method in methods:
             clean, runtimes = {}, []
             for item in items:
                 bits, elapsed = method.timed_fingerprint((DATA_ROOT / item["path"]).resolve())
