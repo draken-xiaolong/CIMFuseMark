@@ -1,0 +1,12 @@
+.env
+data/raw/
+data/converted/
+results/
+paper/build/
+*.log
+__pycache__/
+
+
+# Generated experiment outputs
+results/
+paper/build/

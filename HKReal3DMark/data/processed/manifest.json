@@ -1,0 +1,967 @@
+{
+  "dataset": "Hong Kong 3D Visualisation Map textured tile-based models",
+  "representation": "normalized 2048-point samples from B3DM mesh tiles",
+  "models": [
+    {
+      "id": "hk_0000",
+      "region": "1",
+      "source": "1/Data/temp0/Tile_43_124_L1.b3dm",
+      "vertices": 286,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0001",
+      "region": "1",
+      "source": "1/Data/temp0/Tile_44_124_L1.b3dm",
+      "vertices": 465,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0002",
+      "region": "1",
+      "source": "1/Data/temp0/Tile_40_122_L1.b3dm",
+      "vertices": 268,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0003",
+      "region": "1",
+      "source": "1/Data/temp0/Tile_42_122_L1.b3dm",
+      "vertices": 140,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0004",
+      "region": "1",
+      "source": "1/Data/temp0/Tile_48_123_L1.b3dm",
+      "vertices": 685,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0005",
+      "region": "1",
+      "source": "1/Data/temp0/Tile_47_125_L1.b3dm",
+      "vertices": 623,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0006",
+      "region": "1",
+      "source": "1/Data/temp0/Tile_45_124_L1.b3dm",
+      "vertices": 1263,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0007",
+      "region": "1",
+      "source": "1/Data/temp0/Tile_45_125_L1.b3dm",
+      "vertices": 113,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0008",
+      "region": "2",
+      "source": "2/Data/temp0/Tile_59_136_L1.b3dm",
+      "vertices": 672,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0009",
+      "region": "2",
+      "source": "2/Data/temp0/Tile_62_129_L1.b3dm",
+      "vertices": 584,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0010",
+      "region": "2",
+      "source": "2/Data/temp0/Tile_52_122_L1.b3dm",
+      "vertices": 92,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0011",
+      "region": "2",
+      "source": "2/Data/temp0/Tile_62_133_L1.b3dm",
+      "vertices": 305,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0012",
+      "region": "2",
+      "source": "2/Data/temp0/Tile_53_123_L1.b3dm",
+      "vertices": 172,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0013",
+      "region": "2",
+      "source": "2/Data/temp0/Tile_62_132_L1.b3dm",
+      "vertices": 355,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0014",
+      "region": "2",
+      "source": "2/Data/temp0/Tile_59_129_L1.b3dm",
+      "vertices": 1510,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0015",
+      "region": "2",
+      "source": "2/Data/temp0/Tile_53_122_L1.b3dm",
+      "vertices": 204,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0016",
+      "region": "3",
+      "source": "3/Data/temp0/Tile_120_152_L1.b3dm",
+      "vertices": 1435,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0017",
+      "region": "3",
+      "source": "3/Data/temp0/Tile_120_154_L1.b3dm",
+      "vertices": 1806,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0018",
+      "region": "3",
+      "source": "3/Data/temp0/Tile_125_154_L1.b3dm",
+      "vertices": 320,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0019",
+      "region": "3",
+      "source": "3/Data/temp0/Tile_121_152_L1.b3dm",
+      "vertices": 1582,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0020",
+      "region": "3",
+      "source": "3/Data/temp0/Tile_133_152_L1.b3dm",
+      "vertices": 1308,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0021",
+      "region": "3",
+      "source": "3/Data/temp0/Tile_131_153_L1.b3dm",
+      "vertices": 2025,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0022",
+      "region": "3",
+      "source": "3/Data/temp0/Tile_103_145_L1.b3dm",
+      "vertices": 4762,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0023",
+      "region": "3",
+      "source": "3/Data/temp0/Tile_124_154_L1.b3dm",
+      "vertices": 169,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0024",
+      "region": "4",
+      "source": "4/Data/temp0/Tile_165_153_L1.b3dm",
+      "vertices": 457,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0025",
+      "region": "4",
+      "source": "4/Data/temp0/Tile_150_123_L1.b3dm",
+      "vertices": 356,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0026",
+      "region": "4",
+      "source": "4/Data/temp0/Tile_165_152_L1.b3dm",
+      "vertices": 506,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0027",
+      "region": "4",
+      "source": "4/Data/temp0/Tile_160_152_L1.b3dm",
+      "vertices": 2427,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0028",
+      "region": "4",
+      "source": "4/Data/temp0/Tile_167_153_L1.b3dm",
+      "vertices": 304,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0029",
+      "region": "4",
+      "source": "4/Data/temp0/Tile_163_152_L1.b3dm",
+      "vertices": 383,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0030",
+      "region": "4",
+      "source": "4/Data/temp0/Tile_160_153_L1.b3dm",
+      "vertices": 1087,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0031",
+      "region": "4",
+      "source": "4/Data/temp0/Tile_150_122_L1.b3dm",
+      "vertices": 2728,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0032",
+      "region": "5",
+      "source": "5/Data/temp0/Tile_48_86_L1.b3dm",
+      "vertices": 5026,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0033",
+      "region": "5",
+      "source": "5/Data/temp0/Tile_30_105_L1.b3dm",
+      "vertices": 111,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0034",
+      "region": "5",
+      "source": "5/Data/temp0/Tile_48_88_L1.b3dm",
+      "vertices": 5773,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0035",
+      "region": "5",
+      "source": "5/Data/temp0/Tile_49_88_L1.b3dm",
+      "vertices": 2592,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0036",
+      "region": "5",
+      "source": "5/Data/temp0/Tile_49_119_L1.b3dm",
+      "vertices": 1138,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0037",
+      "region": "5",
+      "source": "5/Data/temp0/Tile_49_118_L1.b3dm",
+      "vertices": 958,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0038",
+      "region": "5",
+      "source": "5/Data/temp0/Tile_49_95_L1.b3dm",
+      "vertices": 5352,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0039",
+      "region": "5",
+      "source": "5/Data/temp0/Tile_49_86_L1.b3dm",
+      "vertices": 6004,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0040",
+      "region": "6",
+      "source": "6/Data/temp0/Tile_55_83_L1.b3dm",
+      "vertices": 141,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0041",
+      "region": "6",
+      "source": "6/Data/temp0/Tile_53_86_L1.b3dm",
+      "vertices": 494,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0042",
+      "region": "6",
+      "source": "6/Data/temp0/Tile_51_85_L1.b3dm",
+      "vertices": 246,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0043",
+      "region": "6",
+      "source": "6/Data/temp0/Tile_50_87_L1.b3dm",
+      "vertices": 241,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0044",
+      "region": "6",
+      "source": "6/Data/temp0/Tile_55_82_L1.b3dm",
+      "vertices": 130,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0045",
+      "region": "6",
+      "source": "6/Data/temp0/Tile_51_87_L1.b3dm",
+      "vertices": 308,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0046",
+      "region": "6",
+      "source": "6/Data/temp0/Tile_52_86_L1.b3dm",
+      "vertices": 251,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0047",
+      "region": "6",
+      "source": "6/Data/temp0/Tile_52_84_L1.b3dm",
+      "vertices": 71,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0048",
+      "region": "8",
+      "source": "8/Data/temp0/Tile_196_115_L1.b3dm",
+      "vertices": 188,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0049",
+      "region": "8",
+      "source": "8/Data/temp0/Tile_150_118_L1.b3dm",
+      "vertices": 121,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0050",
+      "region": "8",
+      "source": "8/Data/temp0/Tile_151_119_L1.b3dm",
+      "vertices": 336,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0051",
+      "region": "8",
+      "source": "8/Data/temp0/Tile_151_118_L1.b3dm",
+      "vertices": 139,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0052",
+      "region": "8",
+      "source": "8/Data/temp0/Tile_195_114_L1.b3dm",
+      "vertices": 805,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0053",
+      "region": "8",
+      "source": "8/Data/temp0/Tile_197_114_L1.b3dm",
+      "vertices": 598,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0054",
+      "region": "8",
+      "source": "8/Data/temp0/Tile_150_119_L1.b3dm",
+      "vertices": 1180,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0055",
+      "region": "8",
+      "source": "8/Data/temp0/Tile_195_115_L1.b3dm",
+      "vertices": 124,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0056",
+      "region": "9",
+      "source": "9/Data/temp0/Tile_48_45_L1.b3dm",
+      "vertices": 681,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0057",
+      "region": "9",
+      "source": "9/Data/temp0/Tile_48_42_L1.b3dm",
+      "vertices": 1288,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0058",
+      "region": "9",
+      "source": "9/Data/temp0/Tile_48_44_L1.b3dm",
+      "vertices": 653,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0059",
+      "region": "9",
+      "source": "9/Data/temp0/Tile_48_46_L1.b3dm",
+      "vertices": 1514,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0060",
+      "region": "9",
+      "source": "9/Data/temp0/Tile_48_41_L1.b3dm",
+      "vertices": 1885,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0061",
+      "region": "9",
+      "source": "9/Data/temp0/Tile_49_40_L1.b3dm",
+      "vertices": 2819,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0062",
+      "region": "9",
+      "source": "9/Data/temp0/Tile_49_70_L1.b3dm",
+      "vertices": 324,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0063",
+      "region": "9",
+      "source": "9/Data/temp0/Tile_49_45_L1.b3dm",
+      "vertices": 759,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0064",
+      "region": "10",
+      "source": "10/Data/temp0/Tile_99_43_L1.b3dm",
+      "vertices": 406,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0065",
+      "region": "10",
+      "source": "10/Data/temp0/Tile_99_46_L1.b3dm",
+      "vertices": 468,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0066",
+      "region": "10",
+      "source": "10/Data/temp0/Tile_98_43_L1.b3dm",
+      "vertices": 230,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0067",
+      "region": "10",
+      "source": "10/Data/temp0/Tile_98_45_L1.b3dm",
+      "vertices": 284,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0068",
+      "region": "10",
+      "source": "10/Data/temp0/Tile_99_47_L1.b3dm",
+      "vertices": 427,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0069",
+      "region": "10",
+      "source": "10/Data/temp0/Tile_53_72_L1.b3dm",
+      "vertices": 1079,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0070",
+      "region": "10",
+      "source": "10/Data/temp0/Tile_55_65_L1.b3dm",
+      "vertices": 1004,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0071",
+      "region": "10",
+      "source": "10/Data/temp0/Tile_98_46_L1.b3dm",
+      "vertices": 288,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0072",
+      "region": "11",
+      "source": "11/Data/temp0/Tile_101_71_L1.b3dm",
+      "vertices": 151,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0073",
+      "region": "11",
+      "source": "11/Data/temp0/Tile_102_66_L1.b3dm",
+      "vertices": 437,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0074",
+      "region": "11",
+      "source": "11/Data/temp0/Tile_102_67_L1.b3dm",
+      "vertices": 3597,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0075",
+      "region": "11",
+      "source": "11/Data/temp0/Tile_102_57_L1.b3dm",
+      "vertices": 249,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0076",
+      "region": "11",
+      "source": "11/Data/temp0/Tile_103_70_L1.b3dm",
+      "vertices": 3830,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0077",
+      "region": "11",
+      "source": "11/Data/temp0/Tile_100_56_L1.b3dm",
+      "vertices": 200,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0078",
+      "region": "11",
+      "source": "11/Data/temp0/Tile_100_70_L1.b3dm",
+      "vertices": 1421,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0079",
+      "region": "11",
+      "source": "11/Data/temp0/Tile_103_58_L1.b3dm",
+      "vertices": 286,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0080",
+      "region": "12",
+      "source": "12/Data/temp0/Tile_150_42_L1.b3dm",
+      "vertices": 439,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0081",
+      "region": "12",
+      "source": "12/Data/temp0/Tile_151_46_L1.b3dm",
+      "vertices": 289,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0082",
+      "region": "12",
+      "source": "12/Data/temp0/Tile_150_40_L1.b3dm",
+      "vertices": 199,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0083",
+      "region": "12",
+      "source": "12/Data/temp0/Tile_150_45_L1.b3dm",
+      "vertices": 414,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0084",
+      "region": "12",
+      "source": "12/Data/temp0/Tile_150_46_L1.b3dm",
+      "vertices": 415,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0085",
+      "region": "12",
+      "source": "12/Data/temp0/Tile_151_44_L1.b3dm",
+      "vertices": 291,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0086",
+      "region": "12",
+      "source": "12/Data/temp0/Tile_150_41_L1.b3dm",
+      "vertices": 379,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0087",
+      "region": "12",
+      "source": "12/Data/temp0/Tile_150_47_L1.b3dm",
+      "vertices": 88,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0088",
+      "region": "13",
+      "source": "13/Data/temp0/Tile_48_39_L1.b3dm",
+      "vertices": 2684,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0089",
+      "region": "13",
+      "source": "13/Data/temp0/Tile_48_36_L1.b3dm",
+      "vertices": 3528,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0090",
+      "region": "13",
+      "source": "13/Data/temp0/Tile_49_37_L1.b3dm",
+      "vertices": 3742,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0091",
+      "region": "13",
+      "source": "13/Data/temp0/Tile_49_36_L1.b3dm",
+      "vertices": 1254,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0092",
+      "region": "13",
+      "source": "13/Data/temp0/Tile_48_37_L1.b3dm",
+      "vertices": 2959,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0093",
+      "region": "13",
+      "source": "13/Data/temp0/Tile_49_39_L1.b3dm",
+      "vertices": 3120,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0094",
+      "region": "13",
+      "source": "13/Data/temp0/Tile_48_38_L1.b3dm",
+      "vertices": 2551,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0095",
+      "region": "13",
+      "source": "13/Data/temp0/Tile_49_38_L1.b3dm",
+      "vertices": 5028,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0096",
+      "region": "14",
+      "source": "14/Data/temp0/Tile_58_21_L1.b3dm",
+      "vertices": 200,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0097",
+      "region": "14",
+      "source": "14/Data/temp0/Tile_94_27_L1.b3dm",
+      "vertices": 187,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0098",
+      "region": "14",
+      "source": "14/Data/temp0/Tile_93_29_L1.b3dm",
+      "vertices": 837,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0099",
+      "region": "14",
+      "source": "14/Data/temp0/Tile_54_33_L1.b3dm",
+      "vertices": 1240,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0100",
+      "region": "14",
+      "source": "14/Data/temp0/Tile_52_35_L1.b3dm",
+      "vertices": 112,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0101",
+      "region": "14",
+      "source": "14/Data/temp0/Tile_55_35_L1.b3dm",
+      "vertices": 3410,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0102",
+      "region": "14",
+      "source": "14/Data/temp0/Tile_75_39_L1.b3dm",
+      "vertices": 1335,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0103",
+      "region": "14",
+      "source": "14/Data/temp0/Tile_51_36_L1.b3dm",
+      "vertices": 115,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0104",
+      "region": "15",
+      "source": "15/Data/Tile_+298_+014/Tile_+298_+014_L19_00210.b3dm",
+      "vertices": 4545,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0105",
+      "region": "15",
+      "source": "15/Data/Tile_+297_+013/Tile_+297_+013_L19_00331.b3dm",
+      "vertices": 3535,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0106",
+      "region": "15",
+      "source": "15/Data/Tile_+297_+013/Tile_+297_+013_L18_0010.b3dm",
+      "vertices": 5050,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0107",
+      "region": "15",
+      "source": "15/Data/Tile_+298_+014/Tile_+298_+014_L19_00312.b3dm",
+      "vertices": 3534,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0108",
+      "region": "15",
+      "source": "15/Data/Tile_+290_+015/Tile_+290_+015_L17_00.b3dm",
+      "vertices": 5953,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0109",
+      "region": "15",
+      "source": "15/Data/temp0/Tile_134_32_L1.b3dm",
+      "vertices": 2991,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0110",
+      "region": "15",
+      "source": "15/Data/Tile_+298_+014/Tile_+298_+014_L19_00322.b3dm",
+      "vertices": 3563,
+      "points": 1024,
+      "split": "test"
+    },
+    {
+      "id": "hk_0111",
+      "region": "15",
+      "source": "15/Data/temp0/Tile_135_33_L1.b3dm",
+      "vertices": 3511,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0112",
+      "region": "16",
+      "source": "16/Data/temp0/Tile_151_32_L1.b3dm",
+      "vertices": 326,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0113",
+      "region": "16",
+      "source": "16/Data/temp0/Tile_160_27_L1.b3dm",
+      "vertices": 277,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0114",
+      "region": "16",
+      "source": "16/Data/temp0/Tile_163_24_L1.b3dm",
+      "vertices": 250,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0115",
+      "region": "16",
+      "source": "16/Data/temp0/Tile_151_37_L1.b3dm",
+      "vertices": 252,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0116",
+      "region": "16",
+      "source": "16/Data/temp0/Tile_150_33_L1.b3dm",
+      "vertices": 397,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0117",
+      "region": "16",
+      "source": "16/Data/temp0/Tile_160_38_L1.b3dm",
+      "vertices": 770,
+      "points": 1024,
+      "split": "train"
+    },
+    {
+      "id": "hk_0118",
+      "region": "16",
+      "source": "16/Data/temp0/Tile_161_25_L1.b3dm",
+      "vertices": 246,
+      "points": 1024,
+      "split": "val"
+    },
+    {
+      "id": "hk_0119",
+      "region": "16",
+      "source": "16/Data/temp0/Tile_162_27_L1.b3dm",
+      "vertices": 134,
+      "points": 1024,
+      "split": "val"
+    }
+  ],
+  "failures": []
+}
