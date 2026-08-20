@@ -27,14 +27,10 @@
   "bit_margin_weight": 0.0,
   "curriculum": false,
   "training_attack_families": [
-    "spatial_crop", "object_delete", "surface_delete", "building_delete",
-    "coordinate_noise", "building_add", "object_reorder"
+    "spatial_crop", "object_delete", "surface_delete", "building_delete"
   ],
-  "spatial_crop_levels": [0.2, 0.4, 0.6, 0.8],
-  "object_delete_levels": [0.2, 0.4, 0.6, 0.8],
-  "surface_delete_levels": [0.2, 0.4, 0.6, 0.8],
-  "building_delete_levels": [0.2, 0.4, 0.6, 0.8],
-  "coordinate_noise_levels": [0.001, 0.005, 0.01, 0.02],
-  "building_add_levels": [0.1, 0.2, 0.4, 0.6],
-  "object_reorder_levels": [0.2, 0.4, 0.6, 0.8]
+  "spatial_crop_levels": [0.4, 0.8],
+  "object_delete_levels": [0.4, 0.8],
+  "surface_delete_levels": [0.4, 0.8],
+  "building_delete_levels": [0.4, 0.8]
 }
