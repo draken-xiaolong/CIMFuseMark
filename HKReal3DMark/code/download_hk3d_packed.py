@@ -6,7 +6,7 @@ written to ZIP64 shards. This avoids the multi-megabyte allocation cost of every
 small file on exFAT volumes while preserving original relative paths.
 """
 from __future__ import annotations
-import argparse, json, os, queue, sqlite3, threading, time, urllib.parse, urllib.request, zipfile
+import argparse, json, os, queue, sqlite3, threading, time, urllib.error, urllib.parse, urllib.request, zipfile
 from pathlib import Path
 
 ROOT="https://data.map.gov.hk/api/3d-data/3dtiles/f2/tileset.json"
@@ -20,14 +20,16 @@ class Packed:
     def __init__(self,key,out,workers,shard_size):
         self.key=key;self.out=out;self.workers=workers;self.shard_size=shard_size
         out.mkdir(parents=True,exist_ok=True);self.db=sqlite3.connect(out/'inventory.sqlite',check_same_thread=False)
-        self.db.execute('pragma journal_mode=WAL');self.db.execute('create table if not exists urls(url text primary key,status text,type text,size integer,error text)')
+        self.db.execute('pragma journal_mode=WAL');self.db.execute('create table if not exists urls(url text primary key,status text,type text,size integer,error text,attempts integer default 0)')
+        columns={row[1] for row in self.db.execute('pragma table_info(urls)')}
+        if 'attempts' not in columns:self.db.execute('alter table urls add column attempts integer default 0')
         self.db.commit();self.lock=threading.Lock();self.q=queue.Queue();self.payload=queue.Queue(maxsize=workers*4);self.stop=False
     def auth(self,u):
         s=urllib.parse.urlsplit(u);q=urllib.parse.parse_qs(s.query);q['key']=[self.key];return urllib.parse.urlunsplit((s.scheme,s.netloc,s.path,urllib.parse.urlencode(q,doseq=True),''))
     def add(self,u):
         u=urllib.parse.urlunsplit((*urllib.parse.urlsplit(u)[:3],'',''))
         with self.lock:
-            cur=self.db.execute('insert or ignore into urls values(?,?,?,?,?)',(u,'queued','json' if u.lower().endswith('.json') else 'payload',None,None));self.db.commit()
+            cur=self.db.execute('insert or ignore into urls(url,status,type,size,error,attempts) values(?,?,?,?,?,?)',(u,'queued','json' if u.lower().endswith('.json') else 'payload',None,None,0));self.db.commit()
         if cur.rowcount:self.q.put(u)
     def fetch(self):
         while True:
@@ -44,7 +46,8 @@ class Packed:
                     with self.lock:self.db.execute('update urls set status=?,size=? where url=?',('done',len(data),u));self.db.commit()
                 else:self.payload.put((u,data))
             except Exception as e:
-                with self.lock:self.db.execute('update urls set status=?,error=? where url=?',('queued',str(e)[:500],u));self.db.commit()
+                permanent=isinstance(e,urllib.error.HTTPError) and e.code in {404,410}
+                with self.lock:self.db.execute('update urls set status=?,error=?,attempts=attempts+1 where url=?',('missing' if permanent else 'queued',str(e)[:500],u));self.db.commit()
             self.q.task_done()
     def write(self):
         existing=[int(p.stem.rsplit('_',1)[-1]) for p in self.out.glob('payload_*.zip')]
@@ -73,8 +76,8 @@ class Packed:
         for _ in threads:self.q.put(None)
         for t in threads:t.join()
         self.payload.join();self.payload.put(None);writer.join()
-        total,done,bytes_=self.db.execute("select count(*),sum(status='done'),coalesce(sum(size),0) from urls").fetchone()
-        print(json.dumps({'discovered':total,'done':done,'bytes':bytes_,'complete':total==done}))
+        total,done,missing,bytes_=self.db.execute("select count(*),sum(status='done'),sum(status='missing'),coalesce(sum(size),0) from urls").fetchone()
+        print(json.dumps({'discovered':total,'done':done,'missing':missing,'bytes':bytes_,'complete':total==done+missing}))
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--env',default=str(Path(__file__).resolve().parents[1]/'.env'));p.add_argument('--workers',type=int,default=8);p.add_argument('--shard-size',type=int,default=10000);a=p.parse_args();env(Path(a.env));root=Path(os.environ['HK3D_DATA_ROOT'])/'packed';Packed(os.environ['HK3D_API_KEY'],root,a.workers,a.shard_size).run()
