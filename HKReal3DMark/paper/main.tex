@@ -1,0 +1,33 @@
+% !TeX program = xelatex
+\documentclass[UTF8,fontset=fandol,11pt]{ctexart}
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{amsmath,booktabs,graphicx,subcaption,hyperref,natbib}
+\hypersetup{colorlinks=true,citecolor=blue,urlcolor=blue}
+\IfFileExists{results_macros.tex}{\input{results_macros}}{\newcommand{\ModelParams}{待生成}\newcommand{\UniqueMean}{--}\newcommand{\UniqueQ}{--}\newcommand{\UniqueMax}{--}\newcommand{\WorstAUC}{--}}
+\title{HKReal3DMark：面向香港实景三维网格版权认证的\轻量鲁棒零水印方法}
+\author{作者信息待定}
+\date{}
+\begin{document}\maketitle
+\begin{abstract}
+实景三维城市模型由倾斜摄影测量重建而成，具有数据规模大、生产成本高、易于无损复制和跨格式传播等特点。传统嵌入式网格水印会修改顶点或纹理，可能影响测绘成果精度；现有零水印依赖人工径向统计，在强裁剪和相似城市瓦片间容易出现鲁棒性与唯一性冲突。本文提出 HKReal3DMark，一种面向 Cesium/B3DM 实景三维网格的轻量学习式零水印框架。方法从三角网格确定性采样点集，经鲁棒中心、尺度和主轴规范化后，以 PointNet 式局部编码及径向分位数融合提取内容表示；通过原始--攻击多视图对比学习、软比特一致性和异源分离约束学习攻击不变量；登记阶段冻结编码器，仅优化密钥化二值投影。本文基于香港地政总署全港三维视觉化地图建立跨区域瓦片实验集，考察旋转、缩放、噪声、量化、删点、简化、空间裁剪、离群点及连续复合攻击。固定随机种子实验中，登记模型异源 NC 均值、q95 和最大值分别为 \UniqueMean、\UniqueQ 和 \UniqueMax，最差攻击 AUC 为 \WorstAUC。结果说明零水印必须联合评价同源 NC 与异源唯一性，且空间裁剪仍是实景网格认证的主要困难。
+\end{abstract}
+\noindent\textbf{关键词：}实景三维；零水印；三维网格；对比学习；Cesium；版权认证
+\section{引言}
+香港三维视觉化地图覆盖建筑、基础设施、植被、水体和地形等地面对象，并同时提供个体模型、分块摄影测量网格及无纹理模型。本文研究对象是其中由倾斜航空影像生成的有纹理分块网格。它属于广义城市三维空间数据，但不包含 CityGML 的对象语义和层级，因此本文不将其表述为 CityGML/CIM 语义模型。
+
+实景三维成果可被直接复制、局部裁剪、降采样或转换格式。零水印不修改载体，而是从内容生成二值指纹并将所有者水印与内容指纹的组合证据登记在外部，因此适合不允许坐标扰动的测绘成果。本文贡献为：（1）建立直接读取 B3DM/GLB 三角网格的香港实景三维零水印流程；（2）设计鲁棒规范化、学习特征与全局径向统计融合编码器；（3）使用强攻击多视图学习和投影式登记，在不微调编码器的条件下协调鲁棒性与唯一性；（4）在九类攻击的连续强度曲线上同时报告平均 NC、尾部 NC、AUC 与异源分布。
+\section{方法}
+给定网格 $M$，确定性采样 $N=2048$ 个顶点并构成点集 $X$。首先减去逐维中位数，以中心半径的稳健分位数归一化尺度，再由截尾协方差的特征向量建立主轴坐标系。对每个点拼接 $(x,y,z)$、绝对坐标和半径，经共享 MLP 得到局部表示。均值、最大值、注意力池化与24维半径分位数共同形成图级向量，最终输出256维单位 embedding。模型共有 \ModelParams 个可训练参数。
+
+训练时，每个对象包含干净视图以及裁剪、离群点和轮换攻击视图。损失由多视图对比项、软比特一致性、最差视图稳定项、比特量化和平衡项及异源分离项组成。登记阶段冻结编码器，为每个登记对象分配1024-bit平衡密钥码字，仅优化线性投影矩阵；因此模型文件和原始网格均不被修改。
+\section{实验}
+数据来自香港地政总署 Open3Dhk 三维视觉化地图的有纹理 tile-based Cesium 数据。当前固定实验集从不同一级分区的详细 B3DM 瓦片分层抽取120个有效模型，按60\%/20\%/20\%划分训练、验证和测试集，解析失败为0。正式实验固定随机种子2026并在 NVIDIA RTX 4090 上运行。
+
+攻击包括任意轴旋转、统一缩放、尺度归一化高斯噪声、坐标量化、随机点删除、随机简化、单侧空间裁剪、离群点注入，以及噪声--量化--删点--旋转连续攻击。除平均 NC 外，使用干净异源指纹作为负样本计算 ROC-AUC 和 EER。
+\section{结果与讨论}
+\begin{figure}[htbp]\centering\includegraphics[width=\textwidth]{figures/robustness_grid.pdf}\caption{九类攻击下的攻击强度--NC曲线。实线为平均NC，虚线为跨模型第5百分位NC。}\label{fig:robust}\end{figure}
+登记指纹的异源 NC 均值为 \UniqueMean，q95 为 \UniqueQ，最大值为 \UniqueMax，说明个性化投影没有通过指纹坍缩换取虚假鲁棒性。旋转、尺度、噪声、量化与随机删点通常保持较高可分性；空间裁剪破坏连续区域并移除身份结构，是最困难的攻击。80\%裁剪仅保留原模型20\%内容，应作为压力测试而非正常版权编辑场景。论文终稿仍需在更大跨区域样本上复核置信区间，并增加传统网格零水印基线的同对象适配比较。
+\section{结论}
+本文提出面向香港实景三维网格的学习式零水印方法 HKReal3DMark。方法不修改原始 B3DM 模型，通过稳健几何规范化、多攻击视图训练和投影式登记生成二值版权指纹。实验强调，高同源 NC 必须与低异源 NC 同时成立；后续工作将扩展全港样本规模并研究极端局部裁剪下的开放集认证。
+\bibliographystyle{unsrtnat}
+\end{document}
