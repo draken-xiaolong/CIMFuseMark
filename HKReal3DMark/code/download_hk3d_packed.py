@@ -42,11 +42,14 @@ class Packed:
         for raw in urls:
             u=urllib.parse.urlunsplit((*urllib.parse.urlsplit(raw)[:3],'',''))
             prepared.append((u,'json' if u.lower().endswith('.json') else 'payload'))
-        prepared=list(dict.fromkeys(prepared));new_json=[]
+        prepared=list(dict.fromkeys(prepared));json_rows=[x for x in prepared if x[1]=='json'];payload_rows=[x for x in prepared if x[1]=='payload'];new_json=[]
+        sql='insert or ignore into urls(url,status,type,size,error,attempts) values(?,?,?,?,?,?)'
         with self.lock:
-            for u,kind in prepared:
-                cur=self.db.execute('insert or ignore into urls(url,status,type,size,error,attempts) values(?,?,?,?,?,?)',(u,'queued',kind,None,None,0))
-                if cur.rowcount and kind=='json':new_json.append(u)
+            if payload_rows:
+                self.db.executemany(sql,((u,'queued','payload',None,None,0) for u,_ in payload_rows))
+            for u,_ in json_rows:
+                cur=self.db.execute(sql,(u,'queued','json',None,None,0))
+                if cur.rowcount:new_json.append(u)
         for u in new_json:self.q.put(u)
     def add(self,u):self.add_many([u])
     def fetch(self):
