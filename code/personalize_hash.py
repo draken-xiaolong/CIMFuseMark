@@ -7,13 +7,14 @@ import argparse
 import hashlib
 import json
 import resource
+import tempfile
 import time
 from pathlib import Path
 
 import torch
 import torch.nn.functional as F
 
-from cimfusemark import build_citygml_graph
+from cimfusemark import attack_citygml_xml, build_citygml_graph
 from cimfusemark.personalization import codebook_similarity, keyed_codebook
 from cimfusemark.rgcn import create_model, graph_tensors, lgfm_graph_tensors, model_digest
 
@@ -62,10 +63,32 @@ def main() -> None:
     model.load_state_dict(checkpoint["state_dict"]); model.eval()
     for parameter in model.parameters(): parameter.requires_grad_(False)
     with torch.no_grad():
-        embeddings = torch.stack([model.encode(*tensors(graphs[item["id"]], relations, device,
-                                                        relation_mode, feature_mode,
-                                                        int(base_config["seed"])))
-                                  for item in selected])
+        clean_embeddings = torch.stack([model.encode(*tensors(graphs[item["id"]], relations, device,
+                                                              relation_mode, feature_mode,
+                                                              int(base_config["seed"])))
+                                        for item in selected])
+        embedding_views = clean_embeddings[:, None, :]
+        attack_specs = list(config.get("attack_views", []))
+        if attack_specs:
+            rows = []
+            with tempfile.TemporaryDirectory(prefix="cim_projection_dev_") as temporary:
+                temporary_root = Path(temporary)
+                for item_index, item in enumerate(selected):
+                    row = [clean_embeddings[item_index]]
+                    source = (DATA_ROOT / item["path"]).resolve()
+                    for view_index, spec in enumerate(attack_specs):
+                        target = temporary_root / f"{item['id']}__{view_index}.gml"
+                        attack_citygml_xml(source, target, str(spec["name"]), float(spec["severity"]),
+                                           seed=int(config["augmentation_seed"]) + item_index * 101 + view_index)
+                        try:
+                            attacked = build_citygml_graph(target)
+                            row.append(model.encode(*tensors(attacked, relations, device, relation_mode,
+                                                             feature_mode, int(base_config["seed"]))))
+                        except ValueError:
+                            row.append(clean_embeddings[item_index])
+                    rows.append(torch.stack(row))
+            embedding_views = torch.stack(rows)
+        embeddings = clean_embeddings
         background_embeddings = None
         if background:
             background_embeddings = torch.stack([
@@ -84,14 +107,15 @@ def main() -> None:
     for step in range(int(config["steps"])):
         optimizer.zero_grad()
         normalized_projection = F.normalize(projection, dim=1)
-        logits = embeddings @ normalized_projection.T
+        logits = torch.einsum("nvd,kd->nvk", embedding_views, normalized_projection)
         soft = torch.tanh(logits / float(config["temperature"]))
-        code_loss = (soft - targets).square().mean()
-        margin_loss = F.relu(float(config["logit_margin"]) - targets * logits).mean()
+        target_views = targets[:, None, :]
+        code_loss = (soft - target_views).square().mean()
+        margin_loss = F.relu(float(config["logit_margin"]) - target_views * logits).mean()
         anchor_loss = (1.0 - F.cosine_similarity(normalized_projection, original, dim=1)).mean()
-        noise = torch.randn(embeddings.shape, generator=generator, device=device) * float(config["embedding_noise_std"])
-        noisy_embeddings = F.normalize(embeddings + noise, dim=1)
-        noisy_soft = torch.tanh((noisy_embeddings @ normalized_projection.T) /
+        noise = torch.randn(embedding_views.shape, generator=generator, device=device) * float(config["embedding_noise_std"])
+        noisy_embeddings = F.normalize(embedding_views + noise, dim=2)
+        noisy_soft = torch.tanh(torch.einsum("nvd,kd->nvk", noisy_embeddings, normalized_projection) /
                                 float(config["temperature"]))
         noise_loss = (noisy_soft - soft.detach()).square().mean()
         background_loss = torch.zeros((), device=device)
@@ -119,11 +143,14 @@ def main() -> None:
         similarities = codebook_similarity(registered_bits.float() * 2 - 1)
         off_diagonal = similarities[~torch.eye(len(selected), dtype=torch.bool, device=device)]
     registration = {
-        "protocol": "clean-only registered-model hash personalization",
+        "protocol": ("registered-model projection personalization with independent generic attacks"
+                     if config.get("attack_views") else "clean-only registered-model hash personalization"),
         "split": args.split, "registered_ids": [item["id"] for item in selected],
         "background_split": args.background_split, "background_models": len(background),
         "registered_ids_digest": hashlib.sha256("\n".join(item["id"] for item in selected).encode()).hexdigest()[:16],
         "config": config, "last_loss": last,
+        "generic_attack_views": len(config.get("attack_views", [])),
+        "formal_evaluation_attacks_used": False,
         "elapsed_seconds": time.perf_counter() - started,
         "peak_gpu_memory_bytes": (torch.cuda.max_memory_allocated(device) if device.type == "cuda" else 0),
         "peak_process_rss_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024),

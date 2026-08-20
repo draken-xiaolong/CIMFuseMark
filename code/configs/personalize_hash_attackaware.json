@@ -1,0 +1,27 @@
+{
+  "seed_offset": 1701,
+  "augmentation_seed": 271828,
+  "steps": 1600,
+  "learning_rate": 0.015,
+  "temperature": 0.1,
+  "logit_margin": 0.15,
+  "code_weight": 1.0,
+  "margin_weight": 0.4,
+  "anchor_weight": 0.1,
+  "noise_weight": 0.5,
+  "embedding_noise_std": 0.005,
+  "background_weight": 0.5,
+  "background_correlation_margin": 0.05,
+  "attack_views": [
+    {"name": "object_delete", "severity": 0.35},
+    {"name": "building_delete", "severity": 0.55},
+    {"name": "surface_delete", "severity": 0.55},
+    {"name": "spatial_crop", "severity": 0.55},
+    {"name": "sequential", "severity": 0.35},
+    {"name": "hierarchy_flatten", "severity": 0.70},
+    {"name": "semantic_relabel", "severity": 0.55},
+    {"name": "building_add", "severity": 0.55},
+    {"name": "quantization", "severity": 0.03},
+    {"name": "coordinate_noise", "severity": 0.003}
+  ]
+}
