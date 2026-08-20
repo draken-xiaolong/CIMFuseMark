@@ -35,6 +35,9 @@ SQLite清单建议放在Mac内置APFS磁盘，不要直接在exFAT移动盘上�
 `HK3D_DISCOVER_ONLY=1`。JSON队列归零后进程会驻留，并生成
 `metadata/payload_phase_paused.json`，不会将移动盘写满。
 
+全港索引的最终数量、payload 抽样容量与存储结论见
+[`docs/01-全港索引终审-20260821.md`](docs/01-全港索引终审-20260821.md)。
+
 ## 当前实现
 
 1. `download_hk3d_packed.py`以SQLite保存层级清单和压缩后的JSON正文，并将B3DM写入每片10,000文件的ZIP64，避免移动硬盘的小文件空间放大；
