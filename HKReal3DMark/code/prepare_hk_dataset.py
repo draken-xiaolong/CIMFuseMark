@@ -52,10 +52,12 @@ def main() -> None:
             failures.append({"source": rel, "error": str(exc)})
     if len(arrays) < 30:
         raise RuntimeError(f"Only {len(arrays)} valid detailed tiles; wait for more data")
-    order = np.arange(len(rows)); rng = np.random.default_rng(2026); rng.shuffle(order)
-    n = len(order); a, b = int(n * .60), int(n * .80)
-    splits = np.empty(n, dtype="U5"); splits[order[:a]]="train"; splits[order[a:b]]="val"; splits[order[b:]]="test"
-    for row, split in zip(rows, splits): row["split"] = str(split)
+    # Geographic holdout: a region may occur in exactly one split. Random
+    # per-tile splitting would leak neighbouring photogrammetric texture and shape.
+    regions=sorted({r["region"] for r in rows},key=lambda x:int(x) if x.isdigit() else x)
+    a=max(1,round(len(regions)*.60));b=max(a+1,round(len(regions)*.80))
+    region_split={r:("train" if i<a else "val" if i<b else "test") for i,r in enumerate(regions)}
+    for row in rows: row["split"]=region_split[row["region"]]
     np.savez_compressed(out / "points.npz", points=np.stack(arrays), ids=np.array([r["id"] for r in rows]))
     manifest = {"dataset":"Hong Kong 3D Visualisation Map textured tile-based models",
                 "representation":"normalized 2048-point samples from B3DM mesh tiles",
