@@ -2,6 +2,10 @@
 
 Minimal feasibility demo for non-invasive zero-watermarking of semantic 3D city models.
 
+## 中文研读手册
+
+当前论文锁定版本的算法、数据、图构建、节点特征、训练损失、零水印登记、Hybrid-10、攻击评价和代码复现说明，见 [`docs/研读手册/README.md`](docs/研读手册/README.md)。文档按小白阅读顺序拆成10篇，可从总览依次阅读。
+
 The demo parses CityGML 3.0 directly, extracts rotation/translation/scale-invariant geometry features together with semantic tag statistics, and maps them to a deterministic binary fingerprint. It then evaluates the fingerprint under simple synthetic attacks.
 
 ## Quick start
