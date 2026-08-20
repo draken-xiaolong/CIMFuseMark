@@ -30,7 +30,7 @@ export HK3D_DATA_ROOT='/Volumes/SANDISK-ELE/HKReal3DMarkData'
 
 ## 当前实现
 
-1. `download_hk3d_packed.py`以SQLite保存层级清单，并将B3DM写入每片10,000文件的ZIP64，避免移动硬盘的小文件空间放大；
+1. `download_hk3d_packed.py`以SQLite保存层级清单和压缩后的JSON正文，并将B3DM写入每片10,000文件的ZIP64，避免移动硬盘的小文件空间放大；
 2. `run_packed_until_complete.sh`负责断点恢复、临时网络错误重试和404缺失资源收敛；
    队列清零后会自动调用`audit_packed_download.py`校验所有ZIP的CRC、B3DM文件头、数量和字节数，
    并生成`metadata/packed_audit.json`；

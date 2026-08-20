@@ -6,7 +6,7 @@ written to ZIP64 shards. This avoids the multi-megabyte allocation cost of every
 small file on exFAT volumes while preserving original relative paths.
 """
 from __future__ import annotations
-import argparse, json, os, queue, sqlite3, threading, time, urllib.error, urllib.parse, urllib.request, zipfile
+import argparse, json, os, queue, sqlite3, threading, time, urllib.error, urllib.parse, urllib.request, zipfile, zlib
 from pathlib import Path
 
 ROOT="https://data.map.gov.hk/api/3d-data/3dtiles/f2/tileset.json"
@@ -20,9 +20,13 @@ class Packed:
     def __init__(self,key,out,workers,shard_size):
         self.key=key;self.out=out;self.workers=workers;self.shard_size=shard_size
         out.mkdir(parents=True,exist_ok=True);self.db=sqlite3.connect(out/'inventory.sqlite',check_same_thread=False)
-        self.db.execute('pragma journal_mode=WAL');self.db.execute('create table if not exists urls(url text primary key,status text,type text,size integer,error text,attempts integer default 0)')
+        self.db.execute('pragma journal_mode=WAL');self.db.execute('create table if not exists urls(url text primary key,status text,type text,size integer,error text,attempts integer default 0,content blob)')
         columns={row[1] for row in self.db.execute('pragma table_info(urls)')}
         if 'attempts' not in columns:self.db.execute('alter table urls add column attempts integer default 0')
+        if 'content' not in columns:self.db.execute('alter table urls add column content blob')
+        # Earlier versions discarded JSON bodies. Re-fetch them once so the
+        # hierarchy, transforms and spatial metadata remain reconstructable.
+        self.db.execute("update urls set status='queued',size=null,error='requeued to retain JSON content' where type='json' and status='done' and content is null")
         self.db.commit();self.lock=threading.Lock();self.q=queue.PriorityQueue();self.payload=queue.Queue(maxsize=workers*4);self.stop=False;self.sequence=0
     def auth(self,u):
         s=urllib.parse.urlsplit(u);q=urllib.parse.parse_qs(s.query);q['key']=[self.key];return urllib.parse.urlunsplit((s.scheme,s.netloc,s.path,urllib.parse.urlencode(q,doseq=True),''))
@@ -47,7 +51,8 @@ class Packed:
                     while stack:
                         n=stack.pop();stack.extend(n.get('children',[]));c=n.get('content') or {};v=c.get('uri') or c.get('url')
                         if v:self.add(urllib.parse.urljoin(u,v))
-                    with self.lock:self.db.execute('update urls set status=?,size=? where url=?',('done',len(data),u));self.db.commit()
+                    packed_json=zlib.compress(data,6)
+                    with self.lock:self.db.execute('update urls set status=?,size=?,content=?,error=null where url=?',('done',len(data),packed_json,u));self.db.commit()
                 else:self.payload.put((u,data))
             except Exception as e:
                 permanent=isinstance(e,urllib.error.HTTPError) and e.code in {404,410}

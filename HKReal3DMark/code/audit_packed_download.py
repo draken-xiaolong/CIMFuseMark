@@ -5,6 +5,7 @@ import json
 import sqlite3
 import time
 import zipfile
+import zlib
 from pathlib import Path
 
 
@@ -26,6 +27,16 @@ def main() -> int:
     expected_payload_bytes = db.execute(
         "select coalesce(sum(size),0) from urls where type='payload' and status='done'"
     ).fetchone()[0]
+    json_done, json_stored = db.execute(
+        "select sum(type='json' and status='done'),sum(type='json' and status='done' and content is not null) from urls"
+    ).fetchone()
+    bad_json = []
+    for url, content in db.execute("select url,content from urls where type='json' and status='done'"):
+        try:
+            json.loads(zlib.decompress(content))
+        except Exception as exc:
+            if len(bad_json) < 20:
+                bad_json.append({"url": url, "error": f"{type(exc).__name__}: {exc}"})
     db.close()
 
     shards = sorted(packed.glob("payload_*.zip"))
@@ -63,6 +74,7 @@ def main() -> int:
 
     valid &= b3dm_entries == (payload_done or 0)
     valid &= zip_uncompressed_bytes == expected_payload_bytes
+    valid &= (json_done or 0) == (json_stored or 0) and not bad_json
     report = {
         "schema_version": 1,
         "audited_unix_time": time.time(),
@@ -74,6 +86,9 @@ def main() -> int:
             "queued": queued or 0,
             "payload_done": payload_done or 0,
             "payload_bytes": expected_payload_bytes,
+            "json_done": json_done or 0,
+            "json_stored": json_stored or 0,
+            "bad_json": bad_json,
         },
         "archives": {
             "shards": len(shards),
