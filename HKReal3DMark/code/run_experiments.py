@@ -115,15 +115,16 @@ def main():
     # views are generated online from each clean registration tile; encoder weights
     # stay frozen and no evaluation attack file is observed.
     enrollment=[]
-    for view in range(4):
-        augmented=np.stack([data[idx] if view==0 else attack(
-            data[idx], ("crop","outliers","sequential")[view-1],
-            (.45,.10,.35)[view-1], np.random.default_rng(args.seed+700001+view*1009+idx))
+    enrollment_views=[("clean",0.0),("crop",.20),("crop",.40),("crop",.60),
+                      ("crop",.80),("outliers",.10),("sequential",.50)]
+    for view,(family,level) in enumerate(enrollment_views):
+        augmented=np.stack([data[idx] if family=="clean" else attack(
+            data[idx], family, level, np.random.default_rng(args.seed+700001+view*1009+idx))
             for idx in test])
         with torch.no_grad(): enrollment.append(model(torch.from_numpy(augmented).to(device)))
     enrollment=torch.stack(enrollment,1)
     personalized=nn.Parameter(projection.clone()); po=torch.optim.Adam([personalized],lr=.015)
-    for _ in range(1200):
+    for _ in range(3000):
         logits=torch.einsum('kvd,bd->kvb',enrollment,personalized)
         targets=code[:,None,:].expand_as(logits)
         loss=F.mse_loss(torch.tanh(logits/.12),targets)+.1*F.relu(.25-targets*logits).mean()+1e-4*(personalized-projection).pow(2).mean()
