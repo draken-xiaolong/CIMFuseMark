@@ -26,7 +26,11 @@ cp .env.example .env
 ```bash
 export HK3D_API_KEY='你的key'
 export HK3D_DATA_ROOT='/Volumes/SANDISK-ELE/HKReal3DMarkData'
+export HK3D_DB_PATH='/Users/wangfugui/Paper/三维CIM水印/HKReal3DMarkState/inventory.sqlite'
 ```
+
+SQLite清单建议放在Mac内置APFS磁盘，不要直接在exFAT移动盘上使用WAL。
+`inventory.pointer`会记录清单的实际位置，B3DM ZIP仍保存在移动盘。
 
 ## 当前实现
 
@@ -42,4 +46,10 @@ export HK3D_DATA_ROOT='/Volumes/SANDISK-ELE/HKReal3DMarkData'
 
 ```bash
 python3 code/packed_download_status.py
+```
+
+按API URL从打包库导出一个JSON或B3DM（URL中不要包含API key）：
+
+```bash
+python3 code/read_packed_resource.py 'https://data.map.gov.hk/.../tile.b3dm' --out /tmp/tile.b3dm
 ```

@@ -2,10 +2,11 @@
 """Print a compact status snapshot for the packed full-territory download."""
 import argparse, glob, json, os, sqlite3, zipfile
 from pathlib import Path
+from packed_paths import inventory_path
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--root',default='/Volumes/SANDISK-ELE/HKReal3DMarkData/packed');a=p.parse_args();root=Path(a.root)
-    db=sqlite3.connect(root/'inventory.sqlite',timeout=30)
+    db=sqlite3.connect(inventory_path(root),timeout=30)
     total,done,missing,json_done,json_stored,payload_done,json_queued,payload_queued,size=db.execute("select count(*),sum(status='done'),sum(status='missing'),sum(type='json' and status='done'),sum(type='json' and status='done' and content is not null),sum(type='payload' and status='done'),sum(type='json' and status='queued'),sum(type='payload' and status='queued'),coalesce(sum(size),0) from urls").fetchone()
     shards=sorted(glob.glob(str(root/'payload_*.zip')))
     # A closed ZIP has a readable central directory; an actively written shard does not.

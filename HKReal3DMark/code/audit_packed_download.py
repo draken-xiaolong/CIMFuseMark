@@ -7,6 +7,7 @@ import time
 import zipfile
 import zlib
 from pathlib import Path
+from packed_paths import inventory_path
 
 
 def main() -> int:
@@ -18,11 +19,12 @@ def main() -> int:
     root = Path(args.root)
     packed = root / "packed"
     report_path = Path(args.report) if args.report else root / "metadata" / "packed_audit.json"
-    db = sqlite3.connect(packed / "inventory.sqlite", timeout=60)
-    total, done, missing, queued, payload_done = db.execute(
+    db = sqlite3.connect(inventory_path(packed), timeout=60)
+    total, done, missing, queued, payload_done, payload_mapped = db.execute(
         """select count(*), sum(status='done'), sum(status='missing'),
                   sum(status not in ('done','missing')),
-                  sum(type='payload' and status='done') from urls"""
+                  sum(type='payload' and status='done'),
+                  sum(type='payload' and status='done' and archive is not null and member is not null) from urls"""
     ).fetchone()
     expected_payload_bytes = db.execute(
         "select coalesce(sum(size),0) from urls where type='payload' and status='done'"
@@ -73,6 +75,7 @@ def main() -> int:
         shard_rows.append(row)
 
     valid &= b3dm_entries == (payload_done or 0)
+    valid &= (payload_done or 0) == (payload_mapped or 0)
     valid &= zip_uncompressed_bytes == expected_payload_bytes
     valid &= (json_done or 0) == (json_stored or 0) and not bad_json
     report = {
@@ -85,6 +88,7 @@ def main() -> int:
             "missing": missing or 0,
             "queued": queued or 0,
             "payload_done": payload_done or 0,
+            "payload_mapped": payload_mapped or 0,
             "payload_bytes": expected_payload_bytes,
             "json_done": json_done or 0,
             "json_stored": json_stored or 0,

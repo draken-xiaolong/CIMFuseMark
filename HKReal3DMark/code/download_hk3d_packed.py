@@ -8,6 +8,7 @@ small file on exFAT volumes while preserving original relative paths.
 from __future__ import annotations
 import argparse, json, os, queue, sqlite3, threading, time, urllib.error, urllib.parse, urllib.request, zipfile, zlib
 from pathlib import Path
+from packed_paths import inventory_path, write_pointer
 
 ROOT="https://data.map.gov.hk/api/3d-data/3dtiles/f2/tileset.json"
 
@@ -17,13 +18,15 @@ def env(path):
             k,v=line.split('=',1);os.environ.setdefault(k.strip(),v.strip())
 
 class Packed:
-    def __init__(self,key,out,workers,shard_size):
+    def __init__(self,key,out,workers,shard_size,db_path=None):
         self.key=key;self.out=out;self.workers=workers;self.shard_size=shard_size
-        out.mkdir(parents=True,exist_ok=True);self.db=sqlite3.connect(out/'inventory.sqlite',check_same_thread=False)
-        self.db.execute('pragma journal_mode=WAL');self.db.execute('create table if not exists urls(url text primary key,status text,type text,size integer,error text,attempts integer default 0,content blob)')
+        out.mkdir(parents=True,exist_ok=True);db_path=inventory_path(out,db_path);db_path.parent.mkdir(parents=True,exist_ok=True);write_pointer(out,db_path);self.db=sqlite3.connect(db_path,check_same_thread=False)
+        self.db.execute('pragma journal_mode=WAL');self.db.execute('create table if not exists urls(url text primary key,status text,type text,size integer,error text,attempts integer default 0,content blob,archive text,member text)')
         columns={row[1] for row in self.db.execute('pragma table_info(urls)')}
         if 'attempts' not in columns:self.db.execute('alter table urls add column attempts integer default 0')
         if 'content' not in columns:self.db.execute('alter table urls add column content blob')
+        if 'archive' not in columns:self.db.execute('alter table urls add column archive text')
+        if 'member' not in columns:self.db.execute('alter table urls add column member text')
         # Earlier versions discarded JSON bodies. Re-fetch them once so the
         # hierarchy, transforms and spatial metadata remain reconstructable.
         self.db.execute("update urls set status='queued',size=null,error='requeued to retain JSON content' where type='json' and status='done' and content is null")
@@ -66,7 +69,7 @@ class Packed:
             self.q.task_done()
     def write(self):
         existing=[int(p.stem.rsplit('_',1)[-1]) for p in self.out.glob('payload_*.zip')]
-        shard=max(existing,default=0);zf=None;count=0
+        shard=max(existing,default=0);zf=None;count=0;archive_name=None
         while True:
             item=self.payload.get()
             if item is None:break
@@ -75,11 +78,11 @@ class Packed:
                 if zf:
                     with self.lock:self.checkpoint(force=True)
                     zf.close()
-                shard+=1;zf=zipfile.ZipFile(self.out/f'payload_{shard:04d}.zip','w',zipfile.ZIP_STORED,allowZip64=True);count=0
+                shard+=1;archive_name=f'payload_{shard:04d}.zip';zf=zipfile.ZipFile(self.out/archive_name,'w',zipfile.ZIP_STORED,allowZip64=True);count=0
             name=urllib.parse.unquote(urllib.parse.urlsplit(u).path).split('/f2/',1)[-1]
             zf.writestr(name,data);count+=1
             with self.lock:
-                self.db.execute('update urls set status=?,size=?,error=null where url=?',('done',len(data),u));self.pending_db+=1;self.checkpoint()
+                self.db.execute('update urls set status=?,size=?,archive=?,member=?,error=null where url=?',('done',len(data),archive_name,name,u));self.pending_db+=1;self.checkpoint()
             self.payload.task_done()
         if zf:
             with self.lock:self.checkpoint(force=True)
@@ -104,5 +107,5 @@ class Packed:
         print(json.dumps({'discovered':total,'done':done,'missing':missing,'bytes':bytes_,'complete':total==done+missing}))
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--env',default=str(Path(__file__).resolve().parents[1]/'.env'));p.add_argument('--workers',type=int,default=8);p.add_argument('--shard-size',type=int,default=10000);a=p.parse_args();env(Path(a.env));root=Path(os.environ['HK3D_DATA_ROOT'])/'packed';Packed(os.environ['HK3D_API_KEY'],root,a.workers,a.shard_size).run()
+    p=argparse.ArgumentParser();p.add_argument('--env',default=str(Path(__file__).resolve().parents[1]/'.env'));p.add_argument('--workers',type=int,default=8);p.add_argument('--shard-size',type=int,default=10000);a=p.parse_args();env(Path(a.env));root=Path(os.environ['HK3D_DATA_ROOT'])/'packed';Packed(os.environ['HK3D_API_KEY'],root,a.workers,a.shard_size,os.environ.get('HK3D_DB_PATH')).run()
 if __name__=='__main__':main()
