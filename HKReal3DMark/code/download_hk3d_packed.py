@@ -51,19 +51,25 @@ class Packed:
             self.q.task_done()
     def write(self):
         existing=[int(p.stem.rsplit('_',1)[-1]) for p in self.out.glob('payload_*.zip')]
-        shard=max(existing,default=0);zf=None;count=0
+        shard=max(existing,default=0);zf=None;count=0;pending=0
         while True:
             item=self.payload.get()
             if item is None:break
             u,data=item
             if zf is None or count>=self.shard_size:
-                if zf:zf.close()
+                if zf:
+                    with self.lock:self.db.commit()
+                    pending=0;zf.close()
                 shard+=1;zf=zipfile.ZipFile(self.out/f'payload_{shard:04d}.zip','w',zipfile.ZIP_STORED,allowZip64=True);count=0
             name=urllib.parse.unquote(urllib.parse.urlsplit(u).path).split('/f2/',1)[-1]
             zf.writestr(name,data);count+=1
-            with self.lock:self.db.execute('update urls set status=?,size=? where url=?',('done',len(data),u));self.db.commit()
+            with self.lock:
+                self.db.execute('update urls set status=?,size=?,error=null where url=?',('done',len(data),u));pending+=1
+                if pending>=100:self.db.commit();pending=0
             self.payload.task_done()
-        if zf:zf.close()
+        if zf:
+            with self.lock:self.db.commit()
+            zf.close()
     def run(self):
         # Recover queued work before adding the root.
         old=[r[0] for r in self.db.execute("select url from urls where status='queued'")];threads=[threading.Thread(target=self.fetch,daemon=True) for _ in range(self.workers)]
