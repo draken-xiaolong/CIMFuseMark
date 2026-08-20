@@ -166,6 +166,15 @@ def main() -> None:
                 for view_index, family in enumerate(forced):
                     allowed = _curriculum_levels(config, family, progress)
                     available = [float(level) for level in allowed if float(level) in record["bank_tensor"][family]]
+                    if not available:
+                        fallback = [name for name in families if record["bank_tensor"].get(name)]
+                        if not fallback:
+                            tensors.append(record["clean_tensor"])
+                            continue
+                        family = fallback[(epoch + record_index + view_index) % len(fallback)]
+                        allowed = _curriculum_levels(config, family, progress)
+                        available = [float(level) for level in allowed
+                                     if float(level) in record["bank_tensor"][family]]
                     level = available[(epoch + record_index + view_index) % len(available)]
                     tensors.append(record["bank_tensor"][family][level])
                 model_views.append(torch.stack([model.encode(*tensor) for tensor in tensors]))
