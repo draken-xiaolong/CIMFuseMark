@@ -89,7 +89,7 @@ $X_c^{80\%}$表示删除半径最大20\%点后的子集。由其协方差特征�
 \end{table}
 模型在RTX~4090上训练1800轮，AdamW学习率$2\times10^{-4}$，固定种子2026。主指标为攻击强度--平均NC，同时报告$q_{0.05}$。异源唯一性统计测试库全部$\binom{24}{2}=276$对；以同源攻击分数为正样本、异源干净分数为负样本计算AUC与EER。
 
-三个人工基线在相同数据、规范化和攻击结果上运行：RadialHist使用128-bin半径直方图；SphericalHist拼接半径、方位角和仰角直方图；MomentFusion融合半径、绝对坐标分位数及协方差谱。它们代表主流人工几何统计思路的统一适配，不宣称逐字复现原论文。
+主对比选择五种同为倾斜摄影实景三维载体的方法：Qu等的精度可控可逆水印（PC-Rev26）\cite{Qu2026}、Nan等的多层曲率QIM方法（Nan25-Curv）\cite{NanCurv2025}、垂向偏度零水印（Nan25-ZW）\cite{NanZW2025}、Jiao等的几何--纹理双域方法（Jiao23-Dual）\cite{Jiao2023}和Qiu等的富信息可逆方法（Qiu19-RI）\cite{Qiu2019}。除PC-Rev26使用公开代码适配外，其余均依据论文公式重写；为适应任意B3DM瓦片，嵌入式方法统一使用确定性扇区重复编码，并固定64-bit公共载荷、种子2026和量化步长0.002。星号表示适配实现未通过无攻击自检，不能被解释为原论文性能的精确复现。
 
 \section{结果与分析}
 \subsection{攻击强度--NC曲线}
@@ -100,6 +100,11 @@ $X_c^{80\%}$表示删除半径最大20\%点后的子集。由其协方差特征�
 登记指纹异源NC均值为\UniqueMean，q95为\UniqueQ，最大值为\UniqueMax，接近独立平衡二值码的0.5。
 \begin{table}[H]\centering\caption{相同地域隔离测试集和攻击实现下的基线比较。}\label{tab:baseline}\input{baseline_table.tex}\end{table}
 人工基线异源q95达到0.846--0.967，相似城市瓦片容易产生近似统计指纹。MomentFusion虽然特征更多，但同源和异源分布同时集中。\method 将异源q95降至\UniqueQ，并将全攻击强度最差AUC提高到\WorstAUC，支持联合学习稳定性与身份间隔。
+
+\subsection{同载体倾斜摄影方法比较}
+\begin{figure}[H]\centering\includegraphics[width=\textwidth]{figures/oblique_baseline_robustness.pdf}\caption{五种倾斜摄影实景三维水印适配方法与本文方法在相同香港测试集上的攻击强度--平均NC曲线。虚线方法未通过无攻击自检。}\label{fig:oblique-baseline}\end{figure}
+\begin{table}[H]\centering\caption{同载体方法的无攻击自检、有效位覆盖率及全攻击最差平均NC。星号表示自检失败。}\label{tab:oblique-baseline}\input{oblique_baseline_table.tex}\end{table}
+PC-Rev26和Jiao23-Dual的无攻击NC分别仅为0.880和0.823，说明论文示例依赖的特征点重分组或纹理分支不能稳定迁移到任意香港瓦片；因此其攻击曲线仅作为适配失败诊断。通过自检的Nan25-Curv、Nan25-ZW和Qiu19-RI的最差平均NC分别为0.478、0.568和0.481，低于本文的0.646。更重要的是，Nan25-ZW在276对异源模型上的NC均值、q95和最大值分别为0.611、0.750和0.844，而本文对应值为\UniqueMean、\UniqueQ 和\UniqueMax，表明偏度统计在相似城市瓦片间存在明显碰撞。
 
 \subsection{轻量性与鲁棒性--唯一性关系}
 编码器仅有\ModelParams 个参数，FP32权重约1.1~MB；1024$\times$256投影约1.0~MB。120模型、1800轮的正式训练在RTX~4090上约157秒，峰值显存约1.3~GB。若编码器对所有模型输出同一码字，任意攻击NC都等于1，但认证失效。AUC把异源登记对作为负样本，因而比单独NC更能反映版权认证能力。
