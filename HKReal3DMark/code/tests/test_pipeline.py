@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from run_experiments import attack, canonical
-from hkreal3d.io import load_b3dm_vertices, normalized_sample
+from hkreal3d.io import load_b3dm_mesh, load_b3dm_vertices, normalized_sample
 
 
 def test_b3dm_sample_parses_and_samples():

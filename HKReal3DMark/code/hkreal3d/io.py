@@ -8,8 +8,8 @@ import numpy as np
 import trimesh
 
 
-def load_b3dm_vertices(path: str | Path) -> np.ndarray:
-    """Read all transformed mesh vertices from a legacy Cesium b3dm container."""
+def load_b3dm_mesh(path: str | Path) -> trimesh.Trimesh:
+    """Read and concatenate transformed triangle primitives from a b3dm tile."""
     blob = Path(path).read_bytes()
     if len(blob) < 28:
         raise ValueError(f"Truncated b3dm: {path}")
@@ -20,14 +20,21 @@ def load_b3dm_vertices(path: str | Path) -> np.ndarray:
         raise ValueError(f"Unsupported b3dm header: {path}")
     offset = 28 + ft_json + ft_bin + bt_json + bt_bin
     scene = trimesh.load(io.BytesIO(blob[offset:byte_length]), file_type="glb", force="scene")
-    vertices = []
+    meshes = []
     for node in scene.graph.nodes_geometry:
         transform, geom_name = scene.graph.get(node)
-        mesh = scene.geometry[geom_name]
-        vertices.append(trimesh.transform_points(np.asarray(mesh.vertices), transform))
-    if not vertices:
-        raise ValueError(f"No mesh geometry in {path}")
-    return np.vstack(vertices).astype(np.float32)
+        mesh = scene.geometry[geom_name].copy()
+        mesh.apply_transform(transform)
+        if len(mesh.vertices) and len(mesh.faces):
+            meshes.append(mesh)
+    if not meshes:
+        raise ValueError(f"No triangle mesh geometry in {path}")
+    return trimesh.util.concatenate(meshes)
+
+
+def load_b3dm_vertices(path: str | Path) -> np.ndarray:
+    """Read all transformed mesh vertices from a legacy Cesium b3dm container."""
+    return np.asarray(load_b3dm_mesh(path).vertices, dtype=np.float32)
 
 
 def normalized_sample(vertices: np.ndarray, count: int, seed: int) -> np.ndarray:
@@ -49,4 +56,3 @@ def normalized_sample(vertices: np.ndarray, count: int, seed: int) -> np.ndarray
     signs = np.sign(np.mean(points ** 3, axis=0)); signs[signs == 0] = 1
     points *= signs
     return points.astype(np.float32)
-
