@@ -118,10 +118,18 @@ class Packed:
             marker.write_text(json.dumps({'reason':'discover_only','json_total':json_total or 0,'payload_total':payload_total or 0,'timestamp':time.time()},indent=2),encoding='utf-8')
             print(json.dumps({'phase':'payload_paused','json_total':json_total,'payload_total':payload_total}),flush=True)
             while True:time.sleep(300)
-        # Phase 2 streams payload URLs through a bounded FIFO queue.
+        # Phase 2 streams payload URLs through a bounded FIFO queue.  When a
+        # reproducible subset has been prepared, restrict transfer to it.
         self.q.maxsize=self.workers*16;last=''
+        selected=os.environ.get('HK3D_SELECTED_ONLY','0').lower() in {'1','true','yes'}
+        if selected:
+            exists=self.db.execute("select 1 from sqlite_master where type='table' and name='payload_selection'").fetchone()
+            if not exists:raise RuntimeError('HK3D_SELECTED_ONLY requires payload_selection')
         while True:
-            batch=self.db.execute("select url from urls where type='payload' and status='queued' and url>? order by url limit 10000",(last,)).fetchall()
+            if selected:
+                batch=self.db.execute("select u.url from urls u join payload_selection s on s.url=u.url where u.type='payload' and u.status='queued' and u.url>? order by u.url limit 10000",(last,)).fetchall()
+            else:
+                batch=self.db.execute("select url from urls where type='payload' and status='queued' and url>? order by url limit 10000",(last,)).fetchall()
             if not batch:break
             for (u,) in batch:self.q.put(u)
             last=batch[-1][0]
